@@ -1,0 +1,27 @@
+MASTER HARDWARE SUPPLY AGREEMENT (Ref: C001-2026)
+
+This Master Supply Agreement is entered into on 15 March 2026 by and between:
+1. ABC Technologies Pvt. Ltd., an enterprise organized under the Companies Act with principal offices at Tech Park, Bangalore ("Purchaser"); and
+2. XYZ Corporation, an enterprise electronics manufacturer with regional operations in Mumbai ("Supplier").
+
+ABC Technologies Pvt. Ltd. entered into a supply agreement with XYZ Corporation for the purchase of 500 Dell PowerEdge servers worth INR 2.5 crore. The agreement was signed by John Smith on 15 March 2026 and is valid until 15 March 2028.
+
+Section 2.1 Hardware Specification:
+Supplier guarantees all Dell PowerEdge servers shall be configured with dual Intel Xeon processors, 256GB ECC DDR5 RAM, and redundant titanium power modules.
+
+Section 2.2 Payment Schedule:
+Payment shall be disbursed upon delivery milestones. Partial invoices may be submitted upon each batch dispatch.
+
+Section 3.1 Logistics Routing:
+All shipments must be routed to ABC Technologies Data Center Unit II, Bangalore Technology Park. Receiving inspection shall be performed within 5 business days of physical receipt.
+
+IN WITNESS WHEREOF, the duly authorized representatives have executed this agreement as of the effective date.
+For ABC Technologies Pvt. Ltd.:
+Signed: John Smith
+Title: Authorised Signatory
+Date: 15 March 2026
+
+For XYZ Corporation:
+Signed: Robert Vance
+Title: Managing Director
+Date: 15 March 2026

@@ -1,0 +1,26 @@
+TAX INVOICE # INV-2026-034
+Date of Issue: 20 March 2026
+Due Date: 30 April 2026 (Net 45 Days)
+
+ISSUER:
+XYZ Corporation
+GSTIN: 27AAACX1234F1Z5
+Mumbai Operations Center
+
+BILLED TO:
+ABC Technologies Pvt. Ltd.
+Tech Park, Bangalore
+GSTIN: 29AAACB9876E1Z2
+
+Order Reference: Contract C001
+Line Item 1: Dell PowerEdge Rack Servers (Qty: 200 units)
+Unit Price: INR 50,000
+Total Taxable Value: INR 1,00,00,000 (INR 1.0 Crore)
+Integrated GST: Included
+Total Amount Payable: INR 1,00,00,000
+
+Remittance Instructions:
+Beneficiary: XYZ Corporation Commercial Escrow
+Bank: HDFC Bank Corporate Branch Mumbai
+Account: 50200019283741
+Payment Terms: Net 45 days. Billed to Bangalore HQ facility.

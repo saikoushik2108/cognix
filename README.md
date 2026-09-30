@@ -1,23 +1,85 @@
-# KnowFlow AI — Document-to-Knowledge Extraction Agent
-> **Document Intelligence → Structured Knowledge**
+# KnowFlow AI
 
-KnowFlow AI is an evidence-backed document intelligence platform that extracts verified business entities, relationships, and structured facts from contracts, invoices, and organizational reports. It links information to an existing business semantic model, enforces strict anti-hallucination guardrails, and provides transparent question-answering with verbatim citation traceability.
+**From Documents to Evidence-Backed Knowledge**
+
+KnowFlow AI is an evidence-backed knowledge intelligence platform that extracts verified business entities, relationships, and structured facts from contracts, invoices, and organizational reports. It links information to an existing business semantic model, enforces strict anti-hallucination guardrails, and provides transparent question-answering with verbatim citation traceability.
 
 ---
 
-## 1. Project Structure
+## 1. Problem Statement & Solution
 
+### Problem
+Business knowledge is trapped inside unstructured documents. Organizations store critical business commitments, pricing terms, SLAs, and supplier obligations across thousands of contracts, invoices, and reports. OCR and standard text extraction convert these files into raw text strings, but raw text alone cannot reveal the underlying entity networks, commercial relationships, or auditable business facts needed for enterprise decision making.
+
+### Solution
+KnowFlow AI systematically parses unstructured documents, extracts entities and directional relationships, extracts discrete key-value business facts, links variations to canonical registry records, preserves verbatim sentence quotations as source evidence, and exposes the resulting knowledge through an interactive knowledge graph and evidence-backed query interface.
+
+---
+
+## 2. Architecture & Pipeline
+
+```text
+Document (PDF / DOCX / TXT)
+   ↓
+Text Extraction [Deterministic: PyMuPDF / python-docx]
+   ↓
+Entity Extraction [AI: Schema-constrained NER]
+   ↓
+Relationship Extraction [AI: Semantic Triples]
+   ↓
+Fact Extraction [AI: Key-Value Predicates]
+   ↓
+Evidence Mapping [Deterministic: Verbatim Substring Locator]
+   ↓
+Entity Resolution [Hybrid: Legal Normalization + Fuzzy Matching]
+   ↓
+Knowledge Store & Representation [Deterministic Graph Store]
+   ↓
+Knowledge Graph [Deterministic Interactive Visualization]
+   ↓
+Evidence-Backed Query [Hybrid: Graph Traversal + Grounded Synthesis]
 ```
+
+### Key Principles
+1. **Evidence-Backed Extraction**: Every entity, relationship, and fact requires verbatim source evidence with exact document and page citations.
+2. **Explicit Uncertainty**: The system distinguishes confirmed facts, partial delivery installments, contextual variances, and unsupported inferences. It never invents facts.
+3. **Entity Resolution**: Normalizes company name variants and links them to canonical registry IDs (e.g. `ABC Technologies Pvt Ltd` → `ORG-1024`).
+4. **Human-in-the-Loop Review**: Low-confidence assertions, ambiguous entities, and direct contradictions are quarantined into review queues for human signoff.
+5. **AI + Deterministic Validation**: Leverages AI for pattern recognition while enforcing deterministic string verification, offset mapping, and graph integrity.
+6. **Traceable Knowledge**: All answers in "Ask Knowledge" include an auditable **"How did we get this answer?"** reasoning trail.
+
+---
+
+## 3. Tech Stack
+
+- **Frontend**:
+  - React 19 + Vite
+  - React Flow (`@xyflow/react` v12) for interactive knowledge graph exploration
+  - Recharts for extraction telemetry, confidence distribution, and category breakdown
+  - Lucide React icons
+  - Vanilla CSS design tokens (enterprise light theme, responsive, zero heavy CSS framework overhead)
+- **Backend**:
+  - FastAPI (Python 3.11)
+  - Pydantic v2 data validation schemas
+  - PyMuPDF (`fitz`) for vector text parsing and page indexing
+  - `python-docx` for Word document processing
+  - Uvicorn ASGI server with automatic reload
+
+---
+
+## 4. Project Directory Structure
+
+```text
 cognix/
 ├── backend/
 │   ├── .venv/                      # Python virtual environment (CPython 3.11)
 │   ├── main.py                     # FastAPI application & REST endpoints
-│   ├── models.py                   # Pydantic schemas (Document, Entity, Relationship, Fact, etc.)
+│   ├── models.py                   # Pydantic models (Document, Entity, Relationship, Fact, etc.)
 │   ├── requirements.txt            # FastAPI, Uvicorn, PyMuPDF, python-docx, Pydantic
 │   ├── data/
 │   │   └── seed_data.py            # Master seed documents, entities, relations, facts, contradictions
 │   └── services/
-│       ├── ai_service.py           # Clean AI extraction & query reasoning service abstraction
+│       ├── ai_service.py           # AI extraction & query reasoning service abstraction
 │       └── document_parser.py      # PyMuPDF & python-docx file extraction service
 ├── frontend/
 │   ├── index.html                  # HTML entrypoint with Plus Jakarta Sans & JetBrains Mono
@@ -25,62 +87,57 @@ cognix/
 │   ├── package.json                # React 19, Vite, React Router, React Flow, Recharts, Lucide
 │   └── src/
 │       ├── main.jsx                # Application root
-│       ├── App.jsx                 # React Router definitions for all 15 pages
-│       ├── index.css               # Design system tokens, enterprise typography, light theme
+│       ├── App.jsx                 # React Router definitions for all 16 pages
+│       ├── index.css               # Design system tokens, typography, clean light theme
 │       ├── components/
 │       │   ├── layout/
 │       │   │   ├── AppShell.jsx    # Persistent layout with Header, Sidebar & Modals
-│       │   │   ├── Header.jsx      # Global search, notifications popover, walk-through guide
-│       │   │   └── Sidebar.jsx     # Collapsible navigation with badge counters
+│       │   │   ├── Header.jsx      # Global search, notifications popover, walkthrough guide
+│       │   │   └── Sidebar.jsx     # 4-section navigation (Overview, Knowledge, Intelligence, System)
 │       │   └── common/
 │       │       ├── EntityBadge.jsx     # Color-coded badges for 8 entity types
 │       │       ├── ConfidenceBadge.jsx # Verified (green), review (amber), flagged (red)
 │       │       ├── KpiCard.jsx         # Metric card with icons and trends
 │       │       ├── UploadModal.jsx     # Drag-and-drop file upload & Demo Document loader
-│       │       ├── HelpModal.jsx       # 8-step jury walkthrough and feature overview
-│       │       ├── EntityDrawer.jsx    # Slide-out drawer for entity schema & provenance
-│       │       └── EvidenceDrawer.jsx  # Slide-out drawer for sentence quotations & context
+│       │       └── HelpModal.jsx       # 12-step jury walkthrough and feature overview
 │       ├── pages/
-│       │   ├── DashboardPage.jsx            # Page 1: Enterprise intelligence dashboard
-│       │   ├── DocumentsPage.jsx            # Page 2: Document management & dropzone
-│       │   ├── DocumentProcessingPage.jsx   # Page 3: 8-stage interactive visual pipeline
-│       │   ├── DocumentInspectorPage.jsx    # Page 4: 3-column grounded viewer with entity tags
-│       │   ├── EntityExplorerPage.jsx       # Page 5: Searchable & sortable entity catalog
-│       │   ├── RelationshipExplorerPage.jsx # Page 6: Triple cards with hallucination warnings
-│       │   ├── FactExplorerPage.jsx         # Page 7: Structured fact table with evidence triggers
-│       │   ├── EvidenceCenterPage.jsx       # Page 8: Verbatim sentence provenance center
-│       │   ├── ReviewCenterPage.jsx         # Page 9: Human-in-the-loop review queue
-│       │   ├── KnowledgeGraphPage.jsx       # Page 10: Interactive React Flow knowledge graph
-│       │   ├── SemanticModelPage.jsx        # Page 11: Enterprise ontology schema explorer
-│       │   ├── AskKnowledgePage.jsx         # Page 12: Natural language query & reasoning stepper
-│       │   ├── ContradictionsPage.jsx       # Page 13: Side-by-side conflicting source resolver
-│       │   ├── AnalyticsPage.jsx            # Page 14: Recharts telemetry & confidence breakdown
-│       │   └── SettingsPage.jsx             # Page 15: AI engine & hallucination guardrails
+│       │   ├── DashboardPage.jsx            # Real-time intelligence dashboard
+│       │   ├── DocumentsPage.jsx            # Document catalog & upload dropzone
+│       │   ├── DocumentProcessingPage.jsx   # 8-stage interactive visual pipeline
+│       │   ├── DocumentInspectorPage.jsx    # 3-column grounded viewer with search & click-to-highlight
+│       │   ├── EntityExplorerPage.jsx       # Searchable & sortable entity catalog
+│       │   ├── RelationshipExplorerPage.jsx # Directional triple cards with guardrail warnings
+│       │   ├── FactExplorerPage.jsx         # Structured fact table with evidence triggers
+│       │   ├── EvidenceCenterPage.jsx       # Verbatim sentence provenance center
+│       │   ├── ReviewCenterPage.jsx         # Human-in-the-loop review queue
+│       │   ├── KnowledgeGraphPage.jsx       # Interactive React Flow graph with JSON export
+│       │   ├── SemanticModelPage.jsx        # Enterprise ontology schema explorer
+│       │   ├── AskKnowledgePage.jsx         # Evidence-backed natural language query interface
+│       │   ├── ContradictionsPage.jsx       # Difference vs contradiction distinction resolver
+│       │   ├── AnalyticsPage.jsx            # Recharts telemetry & confidence breakdown
+│       │   ├── ArchitecturePage.jsx         # AI vs Deterministic pipeline visualizer
+│       │   └── SettingsPage.jsx             # AI engine & hallucination guardrails configuration
 │       └── services/
 │           ├── aiService.js        # Client service abstraction connecting to /api with offline fallback
 │           └── mockData.js         # Client dataset guarantee for presentation reliability
+├── sample_documents/
+│   ├── Contract_001.pdf            # Real binary PDF agreement (ABC Technologies & XYZ Corp)
+│   ├── Contract_001.txt            # Plaintext counterpart
+│   ├── Invoice_034.pdf             # Real binary PDF invoice (Batch 1 partial delivery)
+│   └── Invoice_034.txt             # Plaintext counterpart
 └── README.md
 ```
 
 ---
 
-## 2. How to Run Frontend
+## 5. Quickstart — How to Run
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The frontend will run at `http://127.0.0.1:5173/`.
-
----
-
-## 3. How to Run Backend
+### Backend
 
 ```bash
 cd backend
-# Create virtual environment and install requirements:
+
+# Create virtual environment and install dependencies:
 uv venv .venv
 uv pip install -r requirements.txt
 
@@ -88,107 +145,44 @@ uv pip install -r requirements.txt
 uv run uvicorn main:app --port 8000 --reload
 ```
 
-The backend API will run at `http://127.0.0.1:8000/`.
-Interactive OpenAPI docs are available at `http://127.0.0.1:8000/docs`.
+- API Base: `http://127.0.0.1:8000/`
+- Interactive OpenAPI Docs: `http://127.0.0.1:8000/docs`
 
----
+### Frontend
 
-## 4. Main Features Implemented
-
-1. **Enterprise Dashboard**: Real-time KPI counters (128 documents, 2,481 entities, 4,820 relationships, 7,342 facts), extraction activity timelines, knowledge by category, and attention alerts.
-2. **Document Management & Processing Pipeline**: Drag-and-drop upload zone supporting PDF, DOCX, and TXT, with a 1-click **"Try Demo Document"** action. Visualizes the 8-stage extraction pipeline with per-stage execution durations and logs.
-3. **Document Inspector (3-Column Layout)**: Left column page navigation, center text viewer with interactive colored entity highlight chips, and right column grounded knowledge card.
-4. **Knowledge Explorers**:
-   - **Entity Explorer**: Search, filter by 8 semantic types, sort by mentions or confidence, and open slide-out inspection drawers.
-   - **Relationship Explorer**: Visual triple flowcards with explicit distinctions between verified and unsupported relationships.
-   - **Fact Explorer**: Structured subject-predicate-value table with **"View Evidence"** action.
-5. **Evidence Center**: Displays verbatim quotation citations, surrounding sentence contexts, page numbers, and evidence type flags.
-6. **Review Center (Human-in-the-Loop)**: Categorized review queue for unmatched entity linking (e.g., linking "ABC Technologies" to master record `ORG-1024` with 96% similarity) and low-confidence inferences.
-7. **Strict Anti-Hallucination Guardrails**: Intentionally flags unsupported relationships (e.g. `John Smith → CEO_OF → ABC Technologies` with 61% confidence and warning: *"Document indicates Authorised Signatory, not Chief Executive Officer"*), allowing the user to reject the claim to preserve master graph integrity.
-8. **Interactive React Flow Knowledge Graph**: Custom nodes, animated relationship edges, dashed red lines for unsupported inferences, zoom, pan, search, entity-type filters, and confidence cutoff slider.
-9. **Semantic Model (Ontology)**: Interactive schema definition for Organization, Person, Product, Contract, Invoice, Location, Date, and Money, including allowed relationships and property constraints.
-10. **Natural Language Querying ("Ask Knowledge")**:
-    - Preloaded with prompt chips like *"What contracts does ABC Technologies have?"* or *"Who signed Contract C001?"*.
-    - Features an expandable **"How did we get this answer?"** transparency stepper detailing Question Understanding → Entity Grounding → Graph Traversal → Evidence Assembly → Synthesized Answer.
-11. **Contradiction Detection & Adjudication**: Side-by-side comparison of conflicting records (e.g., Contract C001 Expiry Date: 15 March 2028 in original agreement vs June 2028 in fiscal report) with human adjudication actions.
-12. **Analytics**: Rich Recharts visualizations for throughput trends, confidence histograms, category distribution, and review status.
-13. **Global Search**: Search bar in header with keyboard shortcut (`Ctrl+K`) that searches across documents, entities, relationships, and facts.
-
----
-
-## 5. Which Components are Mocked vs Real
-
-| Component | Status | Implementation Details |
-|---|---|---|
-| **Document Processing (PDF/DOCX/TXT)** | **Real** | Uses `PyMuPDF` (`fitz`) for PDF vector text parsing, `python-docx` for Word documents, and UTF-8 stream decoding for TXT. |
-| **Backend REST API** | **Real** | FastAPI with 18 endpoints, Pydantic validation, CORS middleware, and multipart file upload handling. |
-| **Frontend UI/UX & React Flow Graph** | **Real** | Pure React 19, `@xyflow/react`, `recharts`, `lucide-react`, and vanilla CSS design system. |
-| **Extraction AI Layer** | **Deterministic Mock / Regex Engine** | Structured behind a clean `AIService` abstraction returning typed JSON representations of entities, relationships, facts, and evidence. |
-| **Semantic Matching & Graph Reasoning** | **Realistic Deterministic Heuristics** | Demonstrates entity resolution (linking to canonical IDs like `ORG-1024`), confidence scoring, and anti-hallucination flagging. |
-
----
-
-## 6. How Real LLM Integration Can Be Added Later
-
-The codebase was architected specifically so that integrating a real LLM API (OpenAI GPT-4o, Google Gemini 1.5, Anthropic Claude, or a local Ollama model) requires modifying **only** `backend/services/ai_service.py` without touching the frontend:
-
-```python
-# In backend/services/ai_service.py:
-class AIService:
-    def __init__(self, model_name="gpt-4o"):
-        self.client = OpenAI()
-
-    def extract_entities(self, document_text: str, doc_id: str, doc_name: str) -> List[Dict]:
-        response = self.client.beta.chat.completions.parse(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "Extract named business entities grounded strictly in the provided text. Return verbatim sentence citations."},
-                {"role": "user", "content": document_text}
-            ],
-            response_format=EntityExtractionSchema
-        )
-        return response.choices[0].message.parsed.entities
+```bash
+cd frontend
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Because the frontend and backend communicate via standardized Pydantic data schemas, swapping in an LLM produces zero frontend regressions.
+- Web UI: `http://127.0.0.1:5173/`
 
 ---
 
-## 7. Short Architecture Explanation
+## 6. End-to-End Presentation Flow
 
-```
-[ Documents (PDF / DOCX / TXT) ]
-                │
-                ▼
-[ Document Parser (PyMuPDF / python-docx) ]
-                │
-                ▼
-[ Text Extraction & Chunking ]
-                │
-                ▼
-[ AIService Abstraction ]
-  ├── 1. Entity Extraction (NER)
-  ├── 2. Relationship Extraction (Dependency Parsing)
-  ├── 3. Fact Extraction (Triples)
-  ├── 4. Evidence Attachment (Offsets & Page Citations)
-  ├── 5. Confidence Scoring & Hallucination Guardrails
-  └── 6. Entity Resolution (Ontology Grounding)
-                │
-                ▼
-[ Knowledge Store / FastAPI API Endpoints ]
-                │
-  ┌─────────────┼───────────────┐
-  ▼             ▼               ▼
-[ Knowledge   [ Review Center   [ Ask Knowledge ]
-   Graph ]    (Human Gate) ]     (Evidence-backed QA)
-```
+1. **Dashboard (`/`)**: Inspect real-time metrics (Documents, Entities, Relationships, Facts, Evidence Records, Review Queue items).
+2. **Documents (`/documents`)**: Click **"Upload / Ingest Document"** → select **"Load Real Sample Document (Contract_001.pdf)"**.
+3. **Processing Pipeline (`/processing/:id`)**: Watch the 8-stage processing timeline complete with stage durations, item counts, and status badges.
+4. **Document Inspector (`/documents/inspector/:id`)**:
+   - Column 1: Page navigation (Page 1 cover, Page 2 scope & consideration, Page 3 delivery, Page 4 signatures).
+   - Column 2: In-document search and interactive color-coded entity highlight chips.
+   - Column 3: Tabbed knowledge view (Entities, Relationships, Facts, Evidence). Clicking any item highlights its exact source in the center text.
+5. **Entities (`/knowledge/entities`)**: Search for `ABC Technologies` or filter by Organization/Person/Product.
+6. **Relationships (`/knowledge/relationships`)**: Inspect directional triples (`ABC Technologies → SIGNED → Contract C001`, `XYZ Corporation → SUPPLIES → Dell PowerEdge Servers`). Notice the flagged assumption warning on `John Smith → CEO_OF`.
+7. **Facts (`/knowledge/facts`)**: Click a fact like `Contract Value = INR 2.5 Crore` to reveal the slide-out Evidence Drawer showing the exact verbatim quotation from Contract_001.pdf Page 2.
+8. **Entity Resolution (`/review?tab=unmatched`)**: Accept the canonical match linking `ABC Technologies Pvt Ltd` to `ORG-1024` with 96% similarity.
+9. **Knowledge Graph (`/graph`)**: Explore interactive React Flow nodes with semantic colors, edge labels, search, entity-type filters, confidence slider, and click **"Export Graph JSON"** to download the structured graph file.
+10. **Ask Knowledge (`/ask`)**: Ask *"What is the value of the agreement and how many servers are included?"* Receive `INR 2.5 Crore` and `500 Dell PowerEdge servers` with evidence citations.
+11. **"How did we get this answer?"**: Expand the transparent audit trail showing Question Understanding → Entity Grounding → Graph Traversal → Evidence Assembly → Grounded Answer.
+12. **Differences & Contradictions (`/contradictions`)**: See how the system distinguishes direct contradiction from **Partial Value** delivery (`Contract C001` ₹2.5 Cr commitment vs `Invoice INV-2026-034` ₹1.0 Cr batch 1 fulfillment). Click **"Confirm Partial Delivery Fulfillment"** to resolve it with human audit notes.
+13. **Architecture (`/architecture`)**: Present the 8-stage hybrid paradigm breakdown highlighting `[Deterministic]`, `[AI]`, and `[Hybrid]` execution stages.
 
 ---
 
-## 8. How the Prototype Solves the Problem Statement
+## 7. Sample Documents Included
 
-1. **Distinguishes Confirmed Facts vs Inferences**: Confirmed facts are strictly supported by sentence citations; unsupported inferences (such as assuming an executive's title) are prominently flagged as **"Unsupported"** with hallucination warnings.
-2. **Source Provenance Guaranteed**: Every extracted entity, relationship, and fact contains document name and page number citations with a verbatim quotation.
-3. **Semantic Model Grounding**: Resolves ambiguous or partial mentions (e.g. "ABC Technologies") to master enterprise identifiers (`ORG-1024`), while keeping ungrounded items in a human review queue.
-4. **Transparent Question Answering**: Answers natural language inquiries accompanied by an auditable pipeline stepper (*Question Understanding → Entity Grounding → Knowledge Retrieval → Evidence Collection → Answer Generation*).
-5. **Human-in-the-Loop Control**: Conflicting claims across documents are isolated in the Contradictions Resolver, ensuring AI never arbitrarily decides which contradictory business contract is correct.
+The repository contains real sample files in `sample_documents/`:
+- `Contract_001.pdf` & `Contract_001.txt`: Master Hardware Supply Agreement between ABC Technologies Pvt. Ltd. and XYZ Corporation covering 500 Dell PowerEdge servers worth INR 2.5 Crore.
+- `Invoice_034.pdf` & `Invoice_034.txt`: Tax Invoice for partial delivery batch 1 (200 Dell PowerEdge servers) totaling INR 1.0 Crore.

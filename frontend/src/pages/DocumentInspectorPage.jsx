@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   FileText, ArrowLeft, ExternalLink, Link2, ShieldCheck, 
-  Layers, CheckCircle2, AlertTriangle, Eye, Sparkles, Quote
+  Layers, CheckCircle2, AlertTriangle, Eye, Sparkles, Quote, Search, X
 } from 'lucide-react';
 import EntityBadge from '../components/common/EntityBadge';
 import ConfidenceBadge from '../components/common/ConfidenceBadge';
@@ -12,11 +12,14 @@ export default function DocumentInspectorPage() {
   const { docId } = useParams();
   const navigate = useNavigate();
   const [doc, setDoc] = useState(null);
-  const [selectedPageNum, setSelectedPageNum] = useState(2); // Page 2 has the core demo contract text
+  const [selectedPageNum, setSelectedPageNum] = useState(2); // Page 2 has core contract text
   const [entities, setEntities] = useState([]);
   const [relationships, setRelationships] = useState([]);
   const [facts, setFacts] = useState([]);
-  const [selectedEntity, setSelectedEntity] = useState(null);
+  const [evidenceList, setEvidenceList] = useState([]);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeRightTab, setActiveRightTab] = useState("entities"); // entities, relationships, facts, evidence
 
   useEffect(() => {
     async function load() {
@@ -24,29 +27,31 @@ export default function DocumentInspectorPage() {
       const ents = await aiService.getEntities();
       const rels = await aiService.getRelationships();
       const fcts = await aiService.getFacts();
+      const evs = await aiService.getEvidence();
 
       setDoc(currentDoc);
       setEntities(ents);
       setRelationships(rels);
       setFacts(fcts);
+      setEvidenceList(evs);
 
       // Default select ABC Technologies
       const defaultEnt = ents.find(e => e.name.includes("ABC Technologies")) || ents[0];
-      setSelectedEntity(defaultEnt);
+      setSelectedItem({ type: 'entity', data: defaultEnt, highlightText: defaultEnt?.name });
     }
     load();
   }, [docId]);
 
   const pages = doc?.pages || [
-    { page_number: 1, title: "Cover & Parties", text: "Master Hardware Supply Agreement..." },
-    { page_number: 2, title: "Scope & Consideration", text: "ABC Technologies Pvt. Ltd. entered into a supply agreement with XYZ Corporation..." },
-    { page_number: 3, title: "Delivery & Logistics", text: "Delivery routing to Bangalore..." },
-    { page_number: 4, title: "Signatures", text: "For ABC Technologies: Signed John Smith..." }
+    { page_number: 1, title: "Cover & Parties", text: "Master Hardware Supply Agreement between ABC Technologies Pvt. Ltd. and XYZ Corporation..." },
+    { page_number: 2, title: "Scope & Consideration", text: "ABC Technologies Pvt. Ltd. entered into a supply agreement with XYZ Corporation for the purchase of 500 Dell PowerEdge servers worth INR 2.5 crore. The agreement was signed by John Smith on 15 March 2026 and is valid until 15 March 2028. Deliveries are routed through Bangalore Hub with SLA 99.9%." },
+    { page_number: 3, title: "Delivery & Logistics", text: "Delivery routing to Bangalore data centers under staggered quarterly schedules with hardware warranty." },
+    { page_number: 4, title: "Signatures & Execution", text: "Signed on behalf of ABC Technologies Pvt. Ltd. by John Smith, Authorized Signatory." }
   ];
 
   const currentPage = pages.find(p => p.page_number === selectedPageNum) || pages[0];
 
-  // Helper to highlight entities in text
+  // Helper to render text with highlights for entities and active search/selection
   const renderHighlightedText = (text) => {
     // Entities to highlight
     const highlightTargets = [
@@ -60,7 +65,7 @@ export default function DocumentInspectorPage() {
       { text: "Bangalore", type: "Location", id: "ent-010" }
     ];
 
-    let parts = [{ text: text, isEntity: false }];
+    let parts = [{ text: text, isEntity: false, target: null }];
 
     highlightTargets.forEach(target => {
       let nextParts = [];
@@ -87,11 +92,29 @@ export default function DocumentInspectorPage() {
     });
 
     return parts.map((p, i) => {
+      const isTargetMatch = selectedItem?.highlightText && p.text.toLowerCase().includes(selectedItem.highlightText.toLowerCase());
+      const isSearchMatch = searchTerm.trim().length > 1 && p.text.toLowerCase().includes(searchTerm.toLowerCase());
+
       if (!p.isEntity) {
+        if (isSearchMatch) {
+          return (
+            <mark key={i} style={{ backgroundColor: '#fef08a', color: '#854d0e', padding: '1px 3px', borderRadius: '2px' }}>
+              {p.text}
+            </mark>
+          );
+        }
+        if (isTargetMatch) {
+          return (
+            <mark key={i} style={{ backgroundColor: '#fed7aa', color: '#9a3412', padding: '2px 4px', borderRadius: '4px', fontWeight: 600 }}>
+              {p.text}
+            </mark>
+          );
+        }
         return <span key={i}>{p.text}</span>;
       }
 
-      const isCurrentSelected = selectedEntity?.name === p.target.text;
+      const isCurrentSelected = selectedItem?.data?.name === p.target.text || isTargetMatch;
+
       return (
         <span
           key={i}
@@ -106,11 +129,12 @@ export default function DocumentInspectorPage() {
               source_doc_name: doc?.filename || "Contract_001.pdf",
               source_page: selectedPageNum
             };
-            setSelectedEntity(found);
+            setSelectedItem({ type: 'entity', data: found, highlightText: found.name });
+            setActiveRightTab("entities");
           }}
           style={{
-            backgroundColor: isCurrentSelected ? '#fde047' : '#dbeafe',
-            border: isCurrentSelected ? '1px solid #ca8a04' : '1px solid #93c5fd',
+            backgroundColor: isCurrentSelected ? '#fde047' : isSearchMatch ? '#fef08a' : '#dbeafe',
+            border: isCurrentSelected ? '2px solid #ca8a04' : '1px solid #93c5fd',
             borderRadius: '4px',
             padding: '2px 6px',
             margin: '0 2px',
@@ -132,18 +156,8 @@ export default function DocumentInspectorPage() {
     });
   };
 
-  // Connected relationships for selected entity
-  const connectedRelationships = selectedEntity ? relationships.filter(
-    r => r.source_entity_name.includes(selectedEntity.name) || r.target_entity_name.includes(selectedEntity.name)
-  ) : [];
-
-  // Connected facts for selected entity
-  const connectedFacts = selectedEntity ? facts.filter(
-    f => f.subject_name.includes(selectedEntity.name) || (selectedEntity.name.includes("Contract") && f.subject_name.includes("Contract"))
-  ) : [];
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: 'calc(100vh - 130px)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: 'calc(100vh - 120px)' }}>
       
       {/* Top Breadcrumb Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -159,9 +173,7 @@ export default function DocumentInspectorPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{doc?.filename || 'Contract_001.pdf'}</h2>
               <span className="badge badge-green">Document Inspector</span>
-            </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              Interactive 3-Column Grounded Extraction Viewer
+              <span className="badge badge-blue">3-Column Grounded View</span>
             </div>
           </div>
         </div>
@@ -180,7 +192,7 @@ export default function DocumentInspectorPage() {
       {/* 3-Column Main Inspector Layout */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '220px 1fr 380px',
+        gridTemplateColumns: '220px 1fr 420px',
         gap: '16px',
         flex: 1,
         minHeight: 0
@@ -189,7 +201,7 @@ export default function DocumentInspectorPage() {
         {/* COLUMN 1: LEFT - Document Navigation & Pages */}
         <div className="card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto' }}>
           <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-            Document Pages ({pages.length})
+            Pages ({pages.length})
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -225,128 +237,255 @@ export default function DocumentInspectorPage() {
           </div>
 
           <div style={{ marginTop: 'auto', paddingTop: '12px', borderTop: '1px solid var(--border-light)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Tip: Click any highlighted entity in the viewer to inspect grounded knowledge.
+            Tip: Click any entity or fact in the right panel to locate and highlight it in the text.
           </div>
         </div>
 
-        {/* COLUMN 2: CENTER - Document Text Viewer with Entity Highlights */}
-        <div className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', overflowY: 'auto', backgroundColor: '#ffffff' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '14px', borderBottom: '1px solid var(--border-light)', marginBottom: '16px' }}>
+        {/* COLUMN 2: CENTER - Document Text Viewer with Search & Entity Highlights */}
+        <div className="card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', overflowY: 'auto', backgroundColor: '#ffffff' }}>
+          
+          {/* Document Header & Search Toolbar */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '12px', borderBottom: '1px solid var(--border-light)', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <FileText size={18} color="#2563eb" />
               <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
                 Page {selectedPageNum}: {currentPage.title}
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Interactive Highlight Layer</span>
-              <span className="badge badge-green">Active</span>
+
+            {/* In-Document Search Bar */}
+            <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: '10px', color: '#94a3b8' }} />
+              <input
+                type="text"
+                placeholder="Search within page..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{
+                  padding: '6px 28px 6px 28px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-light)',
+                  fontSize: '0.8rem',
+                  width: '180px'
+                }}
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  style={{ position: 'absolute', right: '8px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  <X size={12} color="#94a3b8" />
+                </button>
+              )}
             </div>
           </div>
 
           {/* Render Text with Highlights */}
           <div style={{
             fontSize: '1rem',
-            lineHeight: 1.8,
+            lineHeight: 1.85,
             color: '#1e293b',
             whiteSpace: 'pre-wrap',
             fontFamily: 'var(--font-sans)',
-            padding: '8px 4px'
+            padding: '4px 2px'
           }}>
             {renderHighlightedText(currentPage.text)}
           </div>
         </div>
 
-        {/* COLUMN 3: RIGHT - Grounded Knowledge Inspector */}
-        <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', overflowY: 'auto', backgroundColor: '#f8fafc' }}>
+        {/* COLUMN 3: RIGHT - Extracted Knowledge Tabs (Entities, Relationships, Facts, Evidence) */}
+        <div className="card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', overflowY: 'auto', backgroundColor: '#f8fafc' }}>
           
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-              Entity Inspection
-            </span>
-            <span className="badge badge-blue">Grounded</span>
+          {/* Tab Selector */}
+          <div style={{ display: 'flex', gap: '4px', backgroundColor: '#e2e8f0', padding: '3px', borderRadius: '6px' }}>
+            {[
+              { id: 'entities', label: 'Entities', count: entities.length },
+              { id: 'relationships', label: 'Relations', count: relationships.length },
+              { id: 'facts', label: 'Facts', count: facts.length },
+              { id: 'evidence', label: 'Evidence', count: evidenceList.length }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveRightTab(tab.id)}
+                style={{
+                  flex: 1,
+                  padding: '5px 4px',
+                  fontSize: '0.75rem',
+                  fontWeight: activeRightTab === tab.id ? 700 : 500,
+                  backgroundColor: activeRightTab === tab.id ? '#ffffff' : 'transparent',
+                  color: activeRightTab === tab.id ? '#0f172a' : '#64748b',
+                  borderRadius: '4px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  boxShadow: activeRightTab === tab.id ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
-          {selectedEntity ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              
-              {/* Entity Main Card */}
-              <div style={{ backgroundColor: '#ffffff', borderRadius: 'var(--radius-md)', padding: '16px', border: '1px solid var(--border-light)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <EntityBadge type={selectedEntity.type} />
-                  <ConfidenceBadge confidence={selectedEntity.confidence} status={selectedEntity.status} />
-                </div>
-
-                <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                  {selectedEntity.name}
-                </div>
-
-                {/* Linked Semantic Entity */}
-                <div style={{ marginTop: '10px', padding: '10px', backgroundColor: selectedEntity.linked_entity_id ? '#eff6ff' : '#fffbeb', borderRadius: '6px', fontSize: '0.8rem' }}>
-                  <div style={{ color: 'var(--text-muted)', fontSize: '0.725rem' }}>Semantic Model Link</div>
-                  <div style={{ fontWeight: 700, color: selectedEntity.linked_entity_id ? '#1d4ed8' : '#b45309' }}>
-                    {selectedEntity.linked_entity_id ? `${selectedEntity.linked_entity_id} (${selectedEntity.linked_entity_name || selectedEntity.name})` : "Unmatched (Requires Review)"}
-                  </div>
-                </div>
-
-                {/* Source Excerpt */}
-                <div style={{ marginTop: '12px' }}>
-                  <div style={{ fontSize: '0.725rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Source Evidence</div>
-                  <div style={{ fontSize: '0.8rem', fontStyle: 'italic', color: 'var(--text-secondary)', backgroundColor: '#f8fafc', padding: '8px', borderRadius: '4px', border: '1px solid #e2e8f0' }}>
-                    "{selectedEntity.evidence_text || 'ABC Technologies entered into a supply agreement with XYZ Corporation...'}"
-                  </div>
-                </div>
-              </div>
-
-              {/* Connected Relationships */}
-              {connectedRelationships.length > 0 && (
-                <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                    Discovered Relationships ({connectedRelationships.length})
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {connectedRelationships.map(r => (
-                      <div 
-                        key={r.id} 
-                        style={{ padding: '8px 10px', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.775rem' }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span className="badge badge-blue">{r.relation_type}</span>
-                          <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>{Math.round(r.confidence * 100)}%</span>
-                        </div>
-                        <div style={{ marginTop: '4px', fontWeight: 600 }}>
-                          {r.source_entity_name} → {r.target_entity_name}
-                        </div>
+          {/* TAB 1: ENTITIES */}
+          {activeRightTab === 'entities' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {entities.map(e => {
+                const isSelected = selectedItem?.data?.id === e.id;
+                return (
+                  <div
+                    key={e.id}
+                    onClick={() => {
+                      setSelectedItem({ type: 'entity', data: e, highlightText: e.name });
+                      if (e.source_page) setSelectedPageNum(e.source_page);
+                    }}
+                    style={{
+                      padding: '10px 12px',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '6px',
+                      border: isSelected ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <EntityBadge type={e.type} />
+                      <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>
+                        {Math.round((e.confidence || 0.95) * 100)}%
+                      </span>
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#0f172a' }}>
+                      {e.name}
+                    </div>
+                    {e.linked_entity_id && (
+                      <div style={{ fontSize: '0.725rem', color: '#2563eb', fontWeight: 600 }}>
+                        → Linked: {e.linked_entity_id}
                       </div>
-                    ))}
+                    )}
                   </div>
-                </div>
-              )}
-
-              {/* Associated Facts */}
-              {connectedFacts.length > 0 && (
-                <div>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                    Extracted Business Facts
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {connectedFacts.map(f => (
-                      <div 
-                        key={f.id} 
-                        style={{ padding: '8px 10px', backgroundColor: '#ffffff', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '0.775rem' }}
-                      >
-                        <div style={{ color: 'var(--text-muted)' }}>{f.predicate}</div>
-                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{f.value}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
+                );
+              })}
             </div>
-          ) : (
-            <div style={{ padding: '30px 10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              Select any highlighted entity from the document text to inspect its structured knowledge.
+          )}
+
+          {/* TAB 2: RELATIONSHIPS */}
+          {activeRightTab === 'relationships' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {relationships.map(r => {
+                const isSelected = selectedItem?.data?.id === r.id;
+                return (
+                  <div
+                    key={r.id}
+                    onClick={() => {
+                      setSelectedItem({ type: 'relationship', data: r, highlightText: r.evidence_text || r.source_entity_name });
+                      if (r.source_page) setSelectedPageNum(r.source_page);
+                    }}
+                    style={{
+                      padding: '10px 12px',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '6px',
+                      border: isSelected ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span className="badge badge-purple" style={{ fontSize: '0.675rem' }}>{r.relation_type}</span>
+                      <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>{Math.round(r.confidence * 100)}%</span>
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '0.8rem', marginTop: '2px' }}>
+                      {r.source_entity_name} → {r.target_entity_name}
+                    </div>
+                    {r.evidence_text && (
+                      <div style={{ fontSize: '0.725rem', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: '2px' }}>
+                        "{r.evidence_text.slice(0, 60)}..."
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* TAB 3: FACTS */}
+          {activeRightTab === 'facts' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {facts.map(f => {
+                const isSelected = selectedItem?.data?.id === f.id;
+                return (
+                  <div
+                    key={f.id}
+                    onClick={() => {
+                      setSelectedItem({ type: 'fact', data: f, highlightText: f.value });
+                      if (f.source_page) setSelectedPageNum(f.source_page);
+                    }}
+                    style={{
+                      padding: '10px 12px',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '6px',
+                      border: isSelected ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)' }}>{f.predicate}</span>
+                      <span style={{ fontSize: '0.7rem', color: '#059669', fontWeight: 600 }}>{Math.round(f.confidence * 100)}%</span>
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#0f172a' }}>
+                      {f.value}
+                    </div>
+                    <div style={{ fontSize: '0.725rem', color: '#2563eb' }}>
+                      Subject: {f.subject_name}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* TAB 4: EVIDENCE */}
+          {activeRightTab === 'evidence' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {evidenceList.map(ev => {
+                const isSelected = selectedItem?.data?.id === ev.id;
+                return (
+                  <div
+                    key={ev.id}
+                    onClick={() => {
+                      setSelectedItem({ type: 'evidence', data: ev, highlightText: ev.quoted_text });
+                      if (ev.page_number) setSelectedPageNum(ev.page_number);
+                    }}
+                    style={{
+                      padding: '10px 12px',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '6px',
+                      border: isSelected ? '2px solid #2563eb' : '1px solid #e2e8f0',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span className="badge badge-green" style={{ fontSize: '0.65rem' }}>Page {ev.page_number}</span>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{ev.claim_type}</span>
+                    </div>
+                    <div style={{ fontSize: '0.775rem', fontStyle: 'italic', color: '#334155', marginTop: '2px' }}>
+                      "{ev.quoted_text}"
+                    </div>
+                    <div style={{ fontSize: '0.725rem', color: '#059669', fontWeight: 600, marginTop: '2px' }}>
+                      Claim: {ev.claim_name}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 

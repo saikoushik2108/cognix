@@ -16,6 +16,7 @@ import ReviewCenterPage from './pages/ReviewCenterPage';
 import ContradictionsPage from './pages/ContradictionsPage';
 import SemanticModelPage from './pages/SemanticModelPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import ArchitecturePage from './pages/ArchitecturePage';
 import SettingsPage from './pages/SettingsPage';
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="contradictions" element={<ContradictionsPage />} />
           <Route path="semantic-model" element={<SemanticModelPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="architecture" element={<ArchitecturePage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

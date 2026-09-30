@@ -96,6 +96,8 @@ class ContradictionItem(BaseModel):
     title: str
     subject: str
     property_name: str
+    difference_type: str = "Contradiction"  # Contradiction, Partial Value, Contextual Variance, Insufficient Evidence
+    interpretation: Optional[str] = None
     doc_a_id: str
     doc_a_name: str
     doc_a_value: str
@@ -104,7 +106,7 @@ class ContradictionItem(BaseModel):
     doc_b_name: str
     doc_b_value: str
     doc_b_evidence: str
-    status: str = "Needs Human Review"  # Needs Human Review, Resolved Doc A, Resolved Doc B, Unresolved
+    status: str = "Needs Human Review"  # Needs Human Review, Resolved Doc A, Resolved Doc B, Unresolved, Confirmed Partial Delivery
     resolution_note: Optional[str] = None
 
 class QueryRequest(BaseModel):

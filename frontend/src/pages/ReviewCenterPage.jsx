@@ -100,7 +100,7 @@ export default function ReviewCenterPage() {
             className="btn btn-secondary btn-sm"
             onClick={() => navigate('/contradictions')}
           >
-            <span>View Contradiction Resolver (2)</span>
+            <span>View Contradiction Resolver</span>
             <ArrowRight size={14} />
           </button>
         </div>
@@ -137,7 +137,7 @@ export default function ReviewCenterPage() {
           className="btn btn-outline btn-sm"
           style={{ flex: 1 }}
         >
-          Contradictions (2 Conflicts) →
+          Contradictions Resolver →
         </button>
       </div>
 

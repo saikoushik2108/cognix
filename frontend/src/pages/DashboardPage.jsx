@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
-  AreaChart, Area, Cell, PieChart, Pie 
+  AreaChart, Area, Cell
 } from 'recharts';
 import KpiCard from '../components/common/KpiCard';
 import ConfidenceBadge from '../components/common/ConfidenceBadge';
@@ -17,16 +17,24 @@ export default function DashboardPage() {
   const { openUpload } = useOutletContext();
   const [documents, setDocuments] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [reviewCount, setReviewCount] = useState(0);
 
   useEffect(() => {
     async function loadData() {
       const docs = await aiService.getDocuments();
       const stats = await aiService.getAnalytics();
-      setDocuments(docs);
+      const revs = await aiService.getReviewItems();
+      setDocuments(docs || []);
       setAnalytics(stats);
+      setReviewCount(revs ? revs.filter(r => r.status === "Pending").length : 0);
     }
     loadData();
   }, []);
+
+  const totalDocs = analytics?.kpis?.documents_processed ?? documents.length;
+  const totalEnts = analytics?.kpis?.entities_extracted ?? 0;
+  const totalRels = analytics?.kpis?.relationships_discovered ?? 0;
+  const totalFacts = analytics?.kpis?.facts_extracted ?? 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
@@ -35,7 +43,7 @@ export default function DashboardPage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-            Good evening 👋
+            Knowledge Dashboard 👋
           </h1>
           <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
             Your document intelligence workspace • <strong>KnowFlow AI</strong>
@@ -64,30 +72,30 @@ export default function DashboardPage() {
       {/* KPI Cards Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
         <KpiCard 
-          title="Documents Processed"
-          value={analytics?.kpis.documents_processed || 128}
-          changeText={`+${analytics?.kpis.documents_processed_today || 12} today`}
+          title="Documents Ingested"
+          value={totalDocs}
+          changeText={totalDocs > 0 ? `${totalDocs} active` : "No documents yet"}
           icon={FileText}
           color="blue"
         />
         <KpiCard 
           title="Entities Extracted"
-          value={analytics?.kpis.entities_extracted.toLocaleString() || "2,481"}
-          changeText={`+${analytics?.kpis.entities_today || 86} today`}
+          value={totalEnts.toLocaleString()}
+          changeText={totalEnts > 0 ? `${totalEnts} extracted` : "Awaiting documents"}
           icon={Layers}
           color="green"
         />
         <KpiCard 
-          title="Relationships Discovered"
-          value={analytics?.kpis.relationships_discovered.toLocaleString() || "4,820"}
-          changeText={`+${analytics?.kpis.relationships_today || 143} today`}
+          title="Relationships"
+          value={totalRels.toLocaleString()}
+          changeText={totalRels > 0 ? `${totalRels} connected` : "Awaiting documents"}
           icon={Link2}
           color="purple"
         />
         <KpiCard 
           title="Facts Extracted"
-          value={analytics?.kpis.facts_extracted.toLocaleString() || "7,342"}
-          changeText={`+${analytics?.kpis.facts_today || 210} today`}
+          value={totalFacts.toLocaleString()}
+          changeText={totalFacts > 0 ? `${totalFacts} grounded` : "Awaiting documents"}
           icon={ShieldCheck}
           color="amber"
         />
@@ -97,23 +105,16 @@ export default function DashboardPage() {
       <div className="card" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', backgroundColor: '#ffffff' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Needs Review:</span>
-            <span className="badge badge-amber" style={{ fontSize: '0.85rem', padding: '3px 10px', cursor: 'pointer' }} onClick={() => navigate('/review')}>
-              23 Items
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Review Queue:</span>
+            <span className={`badge ${reviewCount > 0 ? 'badge-amber' : 'badge-green'}`} style={{ fontSize: '0.85rem', padding: '3px 10px', cursor: 'pointer' }} onClick={() => navigate('/review')}>
+              {reviewCount} {reviewCount === 1 ? 'Item' : 'Items'}
             </span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Unmatched Entities:</span>
-            <span className="badge badge-amber" style={{ fontSize: '0.85rem', padding: '3px 10px', cursor: 'pointer' }} onClick={() => navigate('/review?tab=unmatched')}>
-              12 Entities
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>High Confidence Index:</span>
-            <span className="badge badge-green" style={{ fontSize: '0.85rem', padding: '3px 10px' }}>
-              91.4% Verified
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Knowledge Base:</span>
+            <span className="badge badge-blue" style={{ fontSize: '0.85rem', padding: '3px 10px' }}>
+              {totalDocs > 0 ? 'Active' : 'Empty'}
             </span>
           </div>
         </div>
@@ -136,12 +137,12 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div>
               <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Extraction Activity</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Daily facts and entities processed</p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Facts and entities volume</p>
             </div>
-            <span className="badge badge-blue">Last 7 Days</span>
+            <span className="badge badge-blue">Activity</span>
           </div>
           <div style={{ width: '100%', height: '220px' }}>
-            {analytics?.extraction_activity_timeline && (
+            {analytics?.extraction_activity_timeline?.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={analytics.extraction_activity_timeline}>
                   <defs>
@@ -153,11 +154,17 @@ export default function DashboardPage() {
                   <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} tickLine={false} />
                   <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} axisLine={false} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                    contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}
                   />
                   <Area type="monotone" dataKey="facts" stroke="#2563eb" strokeWidth={2} fillOpacity={1} fill="url(#colorFacts)" name="Facts" />
                 </AreaChart>
               </ResponsiveContainer>
+            ) : (
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <Clock size={32} color="#94a3b8" style={{ marginBottom: '8px' }} />
+                <span>No extraction activity yet.</span>
+                <span style={{ fontSize: '0.75rem', marginTop: '2px' }}>Upload a document to view analytics.</span>
+              </div>
             )}
           </div>
         </div>
@@ -174,21 +181,24 @@ export default function DashboardPage() {
             </button>
           </div>
           <div style={{ width: '100%', height: '220px' }}>
-            {analytics?.entities_by_type && (
+            {totalEnts > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={analytics.entities_by_type} layout="vertical" margin={{ left: 10 }}>
+                <BarChart data={analytics?.entities_by_type || []} layout="vertical" margin={{ left: 10 }}>
                   <XAxis type="number" stroke="#94a3b8" fontSize={11} tickLine={false} />
                   <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={12} tickLine={false} axisLine={false} width={85} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                    {analytics.entities_by_type.map((entry, index) => (
+                    {(analytics?.entities_by_type || []).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
+            ) : (
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                <Layers size={32} color="#94a3b8" style={{ marginBottom: '8px' }} />
+                <span>No entities extracted yet.</span>
+              </div>
             )}
           </div>
         </div>
@@ -198,10 +208,10 @@ export default function DashboardPage() {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <AlertTriangle size={18} color="#d97706" />
-              <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Needs Attention</h3>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>Review & Governance</h3>
             </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Items requiring human verification to safeguard knowledge integrity
+              Human-in-the-loop verification to safeguard knowledge integrity
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -210,31 +220,15 @@ export default function DashboardPage() {
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', backgroundColor: '#fffbeb', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
               >
                 <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#92400e' }}>Unmatched Entities</span>
-                <span className="badge badge-amber">12 items</span>
-              </div>
-
-              <div 
-                onClick={() => navigate('/review?tab=low_confidence')}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', backgroundColor: '#fffbeb', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
-              >
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#92400e' }}>Low-Confidence Facts</span>
-                <span className="badge badge-amber">5 items</span>
+                <span className="badge badge-amber">{reviewCount} items</span>
               </div>
 
               <div 
                 onClick={() => navigate('/contradictions')}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', backgroundColor: '#fef2f2', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
               >
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#991b1b' }}>Possible Contradictions</span>
-                <span className="badge badge-red">2 conflicts</span>
-              </div>
-
-              <div 
-                onClick={() => navigate('/review?tab=ambiguous')}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', backgroundColor: '#f8fafc', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
-              >
-                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#334155' }}>Ambiguous Relationships</span>
-                <span className="badge badge-gray">4 items</span>
+                <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#991b1b' }}>Contradictions & Variance</span>
+                <span className="badge badge-red">Adjudication</span>
               </div>
             </div>
           </div>
@@ -257,7 +251,7 @@ export default function DashboardPage() {
           <div>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 800 }}>Recent Documents</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              Processed contracts, invoices, and commercial filings
+              Ingested business contracts, invoices, and reports
             </p>
           </div>
           <button className="btn btn-secondary btn-sm" onClick={() => navigate('/documents')}>
@@ -280,49 +274,57 @@ export default function DashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {documents.map((doc) => (
-                <tr 
-                  key={doc.id}
-                  style={{ borderBottom: '1px solid var(--border-light)', transition: 'background 0.15s' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <td style={{ padding: '14px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <FileText size={18} color="#2563eb" />
-                      <div>
-                        <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{doc.filename}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{doc.file_size} • {doc.pages_count} pages</div>
+              {documents.length > 0 ? (
+                documents.map((doc) => (
+                  <tr 
+                    key={doc.id}
+                    style={{ borderBottom: '1px solid var(--border-light)', transition: 'background 0.15s' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <td style={{ padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <FileText size={18} color="#2563eb" />
+                        <div>
+                          <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{doc.filename}</div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{doc.file_size} • {doc.pages_count} pages</div>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td style={{ padding: '14px 16px' }}>
-                    <span className="badge badge-gray">{doc.file_type}</span>
-                  </td>
-                  <td style={{ padding: '14px 16px' }}>
-                    <span className={`badge ${doc.status === 'Completed' ? 'badge-green' : 'badge-amber'}`}>
-                      {doc.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px 16px', fontWeight: 600 }}>{doc.entities_count}</td>
-                  <td style={{ padding: '14px 16px', fontWeight: 600 }}>{doc.facts_count}</td>
-                  <td style={{ padding: '14px 16px' }}>
-                    <ConfidenceBadge confidence={doc.confidence_score} />
-                  </td>
-                  <td style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                    {doc.uploaded_at}
-                  </td>
-                  <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                    <button 
-                      className="btn btn-outline btn-sm"
-                      onClick={() => navigate(`/documents/inspector/${doc.id}`)}
-                    >
-                      <ExternalLink size={14} />
-                      <span>Inspect</span>
-                    </button>
+                    </td>
+                    <td style={{ padding: '14px 16px' }}>
+                      <span className="badge badge-gray">{doc.file_type}</span>
+                    </td>
+                    <td style={{ padding: '14px 16px' }}>
+                      <span className={`badge ${doc.status === 'Completed' ? 'badge-green' : 'badge-amber'}`}>
+                        {doc.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 16px', fontWeight: 600 }}>{doc.entities_count || 0}</td>
+                    <td style={{ padding: '14px 16px', fontWeight: 600 }}>{doc.facts_count || 0}</td>
+                    <td style={{ padding: '14px 16px' }}>
+                      <ConfidenceBadge confidence={doc.confidence_score || 0.95} />
+                    </td>
+                    <td style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                      {doc.uploaded_at || "Recent"}
+                    </td>
+                    <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                      <button 
+                        className="btn btn-outline btn-sm"
+                        onClick={() => navigate(`/documents/inspector/${doc.id}`)}
+                      >
+                        <ExternalLink size={14} />
+                        <span>Inspect</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    No documents ingested yet. Click "+ Upload Document" above or load a sample document to begin.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

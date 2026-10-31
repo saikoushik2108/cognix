@@ -126,6 +126,8 @@ class QueryResponse(BaseModel):
     matched_entities: List[Dict[str, Any]]
     matched_facts: List[Dict[str, Any]]
     evidence_citations: List[Dict[str, Any]]
+    graph: Optional[Dict[str, Any]] = None
+    table: Optional[List[Dict[str, Any]]] = None
 
 class SemanticType(BaseModel):
     id: str

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { 
   FileText, Plus, Sparkles, UploadCloud, Search, 
-  ExternalLink, Play, CheckCircle2, AlertTriangle, Filter, ArrowRight 
+  ExternalLink, Play, CheckCircle2, AlertTriangle, Filter, ArrowRight, ScanLine 
 } from 'lucide-react';
 import ConfidenceBadge from '../components/common/ConfidenceBadge';
 import { aiService } from '../services/aiService';
@@ -14,6 +14,7 @@ export default function DocumentsPage() {
   const [filterStatus, setFilterStatus] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [isProcessingDemo, setIsProcessingDemo] = useState(false);
+  const [isIngestingInvoices, setIsIngestingInvoices] = useState(false);
 
   useEffect(() => {
     loadDocs();
@@ -32,6 +33,15 @@ export default function DocumentsPage() {
       navigate(`/processing/${doc.id}`);
     } catch (_) {}
     setIsProcessingDemo(false);
+  };
+
+  const handleIngestInvoices = async () => {
+    setIsIngestingInvoices(true);
+    try {
+      await aiService.ingestAllInvoices();
+      await loadDocs();
+    } catch (_) {}
+    setIsIngestingInvoices(false);
   };
 
   const filteredDocs = documents.filter(doc => {
@@ -53,19 +63,30 @@ export default function DocumentsPage() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <button 
             className="btn btn-secondary"
             onClick={handleDemoContract}
-            disabled={isProcessingDemo}
+            disabled={isProcessingDemo || isIngestingInvoices}
           >
             <Sparkles size={16} color="#2563eb" />
-            <span>{isProcessingDemo ? "Loading Demo..." : "Try Demo Document"}</span>
+            <span>{isProcessingDemo ? "Parsing Sample..." : "Parse Sample File"}</span>
+          </button>
+
+          <button 
+            className="btn"
+            onClick={handleIngestInvoices}
+            disabled={isProcessingDemo || isIngestingInvoices}
+            style={{ backgroundColor: '#9333ea', color: '#ffffff', fontWeight: 700, border: 'none' }}
+          >
+            <ScanLine size={16} />
+            <span>{isIngestingInvoices ? "Auto-Ingesting All 501 Invoices..." : "⚡ Auto-Ingest All Invoices (Neo4j)"}</span>
           </button>
 
           <button 
             className="btn btn-primary"
             onClick={openUpload}
+            disabled={isIngestingInvoices}
           >
             <Plus size={16} />
             <span>+ Upload Document</span>
@@ -189,7 +210,8 @@ export default function DocumentsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredDocs.map((doc) => (
+              {filteredDocs.length > 0 ? (
+                filteredDocs.map((doc) => (
                 <tr 
                   key={doc.id}
                   style={{ borderBottom: '1px solid var(--border-light)', transition: 'background 0.15s' }}
@@ -229,14 +251,14 @@ export default function DocumentsPage() {
                       {doc.status}
                     </span>
                   </td>
-                  <td style={{ padding: '14px 16px', fontWeight: 600 }}>{doc.entities_count}</td>
-                  <td style={{ padding: '14px 16px', fontWeight: 600 }}>{doc.relationships_count}</td>
-                  <td style={{ padding: '14px 16px', fontWeight: 600 }}>{doc.facts_count}</td>
+                  <td style={{ padding: '14px 16px', fontWeight: 600 }}>{doc.entities_count || 0}</td>
+                  <td style={{ padding: '14px 16px', fontWeight: 600 }}>{doc.relationships_count || 0}</td>
+                  <td style={{ padding: '14px 16px', fontWeight: 600 }}>{doc.facts_count || 0}</td>
                   <td style={{ padding: '14px 16px' }}>
-                    <ConfidenceBadge confidence={doc.confidence_score} />
+                    <ConfidenceBadge confidence={doc.confidence_score || 0.95} />
                   </td>
                   <td style={{ padding: '14px 16px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                    {doc.uploaded_at}
+                    {doc.uploaded_at || "Recent"}
                   </td>
                   <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
@@ -258,7 +280,14 @@ export default function DocumentsPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+              ) : (
+                <tr>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
+                    No documents found. Click "+ Upload Document" above or load a sample document to start extracting knowledge.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

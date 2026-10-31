@@ -3,10 +3,10 @@ import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, FileText, Network, HelpCircle, AlertOctagon, 
   Share2, BarChart3, Settings, ChevronLeft, ChevronRight, 
-  Layers, Link2, ShieldCheck, Quote, AlertTriangle, Cpu, GitMerge
+  Layers, Database, ShieldCheck, Quote, AlertTriangle, Cpu, GitMerge
 } from 'lucide-react';
 
-export default function Sidebar({ isCollapsed, onToggleCollapse, reviewCount = 23 }) {
+export default function Sidebar({ isCollapsed, onToggleCollapse, reviewCount = 0, contradictionCount = 0 }) {
   const navLinkStyle = ({ isActive }) => ({
     display: 'flex',
     alignItems: 'center',
@@ -62,21 +62,9 @@ export default function Sidebar({ isCollapsed, onToggleCollapse, reviewCount = 2
           <FileText size={17} style={{ flexShrink: 0 }} />
           {!isCollapsed && <span>Documents</span>}
         </NavLink>
-        <NavLink to="/knowledge/entities" style={navLinkStyle} title={isCollapsed ? "Entities" : undefined}>
-          <Layers size={17} style={{ flexShrink: 0 }} />
-          {!isCollapsed && <span>Entities</span>}
-        </NavLink>
-        <NavLink to="/knowledge/relationships" style={navLinkStyle} title={isCollapsed ? "Relationships" : undefined}>
-          <Link2 size={17} style={{ flexShrink: 0 }} />
-          {!isCollapsed && <span>Relationships</span>}
-        </NavLink>
-        <NavLink to="/knowledge/facts" style={navLinkStyle} title={isCollapsed ? "Facts" : undefined}>
-          <ShieldCheck size={17} style={{ flexShrink: 0 }} />
-          {!isCollapsed && <span>Facts</span>}
-        </NavLink>
-        <NavLink to="/knowledge/evidence" style={navLinkStyle} title={isCollapsed ? "Evidence" : undefined}>
-          <Quote size={17} style={{ flexShrink: 0 }} />
-          {!isCollapsed && <span>Evidence</span>}
+        <NavLink to="/knowledge" style={navLinkStyle} title={isCollapsed ? "Knowledge Repository" : undefined}>
+          <Database size={17} style={{ flexShrink: 0 }} />
+          {!isCollapsed && <span>Knowledge Repository</span>}
         </NavLink>
         <NavLink to="/graph" style={navLinkStyle} title={isCollapsed ? "Knowledge Graph" : undefined}>
           <Network size={17} style={{ flexShrink: 0 }} />
@@ -94,9 +82,11 @@ export default function Sidebar({ isCollapsed, onToggleCollapse, reviewCount = 2
           {!isCollapsed && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
               <span>Review Center</span>
-              <span className="badge badge-amber" style={{ fontSize: '0.675rem', padding: '1px 5px' }}>
-                {reviewCount}
-              </span>
+              {reviewCount > 0 && (
+                <span className="badge badge-amber" style={{ fontSize: '0.675rem', padding: '1px 5px' }}>
+                  {reviewCount}
+                </span>
+              )}
             </div>
           )}
         </NavLink>
@@ -105,7 +95,9 @@ export default function Sidebar({ isCollapsed, onToggleCollapse, reviewCount = 2
           {!isCollapsed && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
               <span>Contradictions</span>
-              <span className="badge badge-red" style={{ fontSize: '0.65rem' }}>3</span>
+              {contradictionCount > 0 && (
+                <span className="badge badge-red" style={{ fontSize: '0.65rem' }}>{contradictionCount}</span>
+              )}
             </div>
           )}
         </NavLink>

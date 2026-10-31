@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UploadCloud, FileText, CheckCircle2, Sparkles, X, AlertCircle } from 'lucide-react';
+import { UploadCloud, FileText, CheckCircle2, Sparkles, X, AlertCircle, Database, ScanLine } from 'lucide-react';
 import { aiService } from '../../services/aiService';
 
 export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
@@ -8,6 +8,7 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState(null);
+  const [isIngestingInvoices, setIsIngestingInvoices] = useState(false);
 
   if (!isOpen) return null;
 
@@ -23,6 +24,25 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
       setUploadError("Failed to load demo document.");
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleIngestInvoices = async (count = 30) => {
+    setIsIngestingInvoices(true);
+    setUploadError(null);
+    try {
+      const res = await aiService.ingestInvoiceDataset(count, 0);
+      if (res && res.success) {
+        if (onUploadSuccess) onUploadSuccess();
+        onClose();
+        navigate('/documents');
+      } else {
+        setUploadError(res?.error || "Failed to ingest invoice dataset.");
+      }
+    } catch (err) {
+      setUploadError("Failed to ingest invoice dataset.");
+    } finally {
+      setIsIngestingInvoices(false);
     }
   };
 
@@ -116,19 +136,71 @@ export default function UploadModal({ isOpen, onClose, onUploadSuccess }) {
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.925rem', color: '#1e3a8a' }}>
-                Instant Demo Document
+                Load Sample Document
               </div>
               <div style={{ fontSize: '0.8rem', color: '#3b82f6' }}>
-                Contract_001.pdf (Master Hardware Supply Agreement, ₹2.5 Cr)
+                Parses Contract_001.pdf from sample_documents/ via PyMuPDF vector engine
               </div>
             </div>
           </div>
           <button
             className="btn btn-primary btn-sm"
             onClick={handleDemoContract}
-            disabled={isUploading}
+            disabled={isUploading || isIngestingInvoices}
           >
-            {isUploading ? "Loading..." : "Try Demo Contract"}
+            {isUploading ? "Extracting..." : "Parse Sample File"}
+          </button>
+        </div>
+
+        {/* KatanaML Invoices Dataset OCR & Neo4j Ingestion */}
+        <div style={{
+          backgroundColor: '#faf5ff',
+          border: '1px dashed #c084fc',
+          borderRadius: 'var(--radius-lg)',
+          padding: '16px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: '#f3e8ff',
+              color: '#9333ea',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <ScanLine size={20} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.925rem', color: '#581c87' }}>
+                KatanaML Invoices Dataset (15-Invoice Batch)
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#7e22ce' }}>
+                Pure OCR text extraction (RapidOCR) • Builds Knowledge Triples • Syncs to Neo4j
+              </div>
+            </div>
+          </div>
+          <button
+            className="btn btn-sm"
+            onClick={handleIngestInvoices}
+            disabled={isUploading || isIngestingInvoices}
+            style={{
+              backgroundColor: '#9333ea',
+              color: '#ffffff',
+              fontWeight: 700,
+              border: 'none',
+              padding: '8px 16px',
+              borderRadius: 'var(--radius-md)',
+              cursor: isIngestingInvoices ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {isIngestingInvoices ? "OCR Ingesting..." : "⚡ Ingest Invoices via OCR"}
           </button>
         </div>
 

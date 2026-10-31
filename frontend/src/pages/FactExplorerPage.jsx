@@ -96,7 +96,8 @@ export default function FactExplorerPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredFacts.map(fact => (
+              {filteredFacts.length > 0 ? (
+                filteredFacts.map(fact => (
                 <tr
                   key={fact.id}
                   style={{ borderBottom: '1px solid var(--border-light)', transition: 'background 0.15s' }}
@@ -144,7 +145,14 @@ export default function FactExplorerPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
+              ))
+              ) : (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
+                    No structured facts found. Upload a business document to extract discrete facts.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

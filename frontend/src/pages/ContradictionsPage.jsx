@@ -89,7 +89,8 @@ export default function ContradictionsPage() {
 
       {/* Contradictions List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        {contradictions.map((c) => {
+        {contradictions.length > 0 ? (
+          contradictions.map((c) => {
           const isResolved = c.status && (c.status.startsWith("Resolved") || c.status.startsWith("Confirmed"));
           const isPartial = c.difference_type === 'Partial Value';
 
@@ -270,7 +271,7 @@ export default function ContradictionsPage() {
                   {isPartial ? (
                     <button 
                       className="btn btn-primary btn-sm"
-                      onClick={() => handleResolve(c.id, 'partial', 'Confirmed as legitimate partial delivery installment (Batch 1: 200 of 500 servers).')}
+                      onClick={() => handleResolve(c.id, 'partial', 'Confirmed as legitimate partial delivery installment.')}
                     >
                       <CheckCircle2 size={16} /> Confirm Partial Delivery Fulfillment
                     </button>
@@ -283,7 +284,14 @@ export default function ContradictionsPage() {
 
             </div>
           );
-        })}
+        })
+        ) : (
+          <div className="card" style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <CheckCircle2 size={40} color="#059669" style={{ margin: '0 auto 12px auto' }} />
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>No contradictions or discrepancies detected</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>All ingested claims across documents are consistent or within expected variance.</p>
+          </div>
+        )}
       </div>
 
     </div>

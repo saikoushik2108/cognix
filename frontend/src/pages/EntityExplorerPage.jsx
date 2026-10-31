@@ -164,7 +164,8 @@ export default function EntityExplorerPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredEntities.map(ent => (
+              {filteredEntities.length > 0 ? (
+                filteredEntities.map(ent => (
                 <tr
                   key={ent.id}
                   style={{ borderBottom: '1px solid var(--border-light)', transition: 'background 0.15s', cursor: 'pointer' }}
@@ -177,7 +178,7 @@ export default function EntityExplorerPage() {
                       {ent.name}
                     </div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      Source: {ent.source_doc_name} (Page {ent.source_page || 1})
+                      Source: {ent.source_doc_name || 'Document'} (Page {ent.source_page || 1})
                     </div>
                   </td>
                   <td style={{ padding: '14px 16px' }}>
@@ -213,7 +214,14 @@ export default function EntityExplorerPage() {
                     </button>
                   </td>
                 </tr>
-              ))}
+              ))
+              ) : (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
+                    No business entities extracted yet. Upload a document to extract organizations, people, products, and contracts.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

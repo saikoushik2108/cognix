@@ -182,22 +182,28 @@ export default function SemanticModelPage() {
                 Canonical Knowledge Instances in Current KB
               </h3>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {selectedType.examples.map(ex => (
-                  <div
-                    key={ex}
-                    style={{
-                      padding: '6px 12px',
-                      backgroundColor: '#ffffff',
-                      border: '1px solid var(--border-light)',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: '0.825rem',
-                      fontWeight: 600,
-                      color: 'var(--text-primary)'
-                    }}
-                  >
-                    {ex}
-                  </div>
-                ))}
+                {selectedType.examples && selectedType.examples.length > 0 ? (
+                  selectedType.examples.map(ex => (
+                    <div
+                      key={ex}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#ffffff',
+                        border: '1px solid var(--border-light)',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: '0.825rem',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)'
+                      }}
+                    >
+                      {ex}
+                    </div>
+                  ))
+                ) : (
+                  <span style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
+                    No instances in knowledge base yet. Extracted entities of this type will appear here when documents are uploaded.
+                  </span>
+                )}
               </div>
             </div>
 

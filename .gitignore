@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+backend/.venv/
+backend/venv/
+.venv/
+venv/
+ENV/
+env/
+backend/.env
+.env
+
+# Node & Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+.npm/
+
+# Large Datasets & Parquet Files (>100MB exceeds GitHub push limit)
+backend/data/invoices_dataset/
+*.parquet
+
+# Logs & Temporary Files
+*.log
+npm-debug.log*
+yarn-debug.log*
+.system_generated/
+.DS_Store
+Thumbs.db

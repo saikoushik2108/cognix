@@ -299,18 +299,12 @@ export default function Header({ onOpenUpload, onOpenHelp }) {
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                 <div style={{ fontWeight: 700, fontSize: '0.875rem' }}>Notifications</div>
-                <span className="badge badge-amber">3 Pending</span>
+                <span className="badge badge-green">Up to date</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem' }}>
-                <div style={{ padding: '8px', backgroundColor: '#fffbeb', borderRadius: '6px' }}>
-                  <strong>Ambiguity Flag:</strong> John Smith CEO_OF ABC Technologies requires review.
-                </div>
-                <div style={{ padding: '8px', backgroundColor: '#fef2f2', borderRadius: '6px' }}>
-                  <strong>Contradiction:</strong> Contract C001 Expiry Date conflict detected.
-                </div>
-                <div style={{ padding: '8px', backgroundColor: '#eff6ff', borderRadius: '6px' }}>
-                  <strong>Model Resolution:</strong> ABC Technologies linked to ORG-1024 (96%).
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '16px 8px' }}>
+                <Check size={24} color="#10b981" style={{ margin: '0 auto 4px auto' }} />
+                <span>No pending alerts or contradictions.</span>
+                <span style={{ fontSize: '0.725rem' }}>System is actively monitoring document extractions.</span>
               </div>
             </div>
           )}

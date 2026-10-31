@@ -82,7 +82,8 @@ export default function RelationshipExplorerPage() {
 
       {/* Relationship Cards Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '16px' }}>
-        {filteredRels.map(rel => {
+        {filteredRels.length > 0 ? (
+          filteredRels.map(rel => {
           const isUnsupported = rel.status === "Unsupported" || rel.status === "Disputed";
           return (
             <div
@@ -177,12 +178,19 @@ export default function RelationshipExplorerPage() {
                 fontSize: '0.75rem',
                 color: 'var(--text-muted)'
               }}>
-                <span>{rel.source_doc_name} (Page {rel.source_page || 1})</span>
+                <span>{rel.source_doc_name || 'Document'} (Page {rel.source_page || 1})</span>
                 <span style={{ color: 'var(--primary-600)', fontWeight: 600 }}>Inspect Evidence →</span>
               </div>
             </div>
           );
-        })}
+        })
+        ) : (
+          <div className="card" style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted)', gridColumn: '1 / -1' }}>
+            <Link2 size={40} color="#94a3b8" style={{ margin: '0 auto 12px auto' }} />
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>No relationships found</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>Upload a document to extract semantic relationships between entities.</p>
+          </div>
+        )}
       </div>
 
       {/* Evidence Side-panel */}

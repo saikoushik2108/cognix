@@ -13,18 +13,32 @@ import {
 class AIService {
   constructor() {
     this.apiBase = '/api';
-    // Local fallback reactive store
-    this.documents = [...INITIAL_DOCUMENTS];
-    this.entities = [...INITIAL_ENTITIES];
-    this.relationships = [...INITIAL_RELATIONSHIPS];
-    this.facts = [...INITIAL_FACTS];
-    this.evidence = [...INITIAL_EVIDENCE];
+
+    const getStored = (key, fallback) => {
+      try {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const item = window.localStorage.getItem(key);
+          if (item) {
+            const parsed = JSON.parse(item);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          }
+        }
+      } catch (_) {}
+      return fallback;
+    };
+
+    // Local reactive store hydrated with persistent local cache or initial bootstrap
+    this.documents = getStored('kf_documents', [...INITIAL_DOCUMENTS]);
+    this.entities = getStored('kf_entities', [...INITIAL_ENTITIES]);
+    this.relationships = getStored('kf_relationships', [...INITIAL_RELATIONSHIPS]);
+    this.facts = getStored('kf_facts', [...INITIAL_FACTS]);
+    this.evidence = getStored('kf_evidence', [...INITIAL_EVIDENCE]);
     this.reviewItems = [...INITIAL_REVIEW_ITEMS];
     this.contradictions = [...INITIAL_CONTRADICTIONS];
     this.semanticModel = [...SEMANTIC_MODEL_DATA];
     this.analytics = { ...INITIAL_ANALYTICS };
     this.settings = {
-      extraction_model: "Prototype Extraction Engine (v2.4)",
+      extraction_model: "KnowFlow-Hybrid-Extraction-Engine-v2",
       confidence_threshold: 0.80,
       entity_resolution_threshold: 0.90,
       automatic_extraction: true,
@@ -34,163 +48,169 @@ class AIService {
     };
   }
 
-  // --- CORE AI EXTRACTION ABSTRACTIONS (As defined in requirements) ---
+  // --- CORE AI EXTRACTION ABSTRACTIONS ---
 
   async extractEntities(documentText, docId = "doc-custom", docName = "Uploaded_Document") {
     try {
       const res = await fetch(`${this.apiBase}/documents/${docId}/entities`);
       if (res.ok) return await res.json();
-    } catch (_) {}
+    } catch (_) { }
 
-    // Clean client-side regex extraction fallback
+    // Dynamic client-side regex extraction fallback
     const entities = [];
-    const lower = documentText.toLowerCase();
+    const foundNames = new Set();
 
-    if (lower.includes("abc technologies")) {
-      entities.push({
-        id: `ent-${Date.now()}-1`,
-        name: "ABC Technologies Pvt. Ltd.",
-        type: "Organization",
-        mentions_count: 18,
-        linked_entity_id: "ORG-1024",
-        linked_entity_name: "ABC Technologies Group",
-        confidence: 0.98,
-        status: "Verified",
-        source_doc_id: docId,
-        source_doc_name: docName,
-        source_page: 2,
-        evidence_text: "ABC Technologies Pvt. Ltd. entered into a supply agreement with XYZ Corporation...",
-        properties: { Industry: "Information Technology", Country: "India" }
-      });
+    // 1. Organizations
+    const orgPatterns = [
+      /\b([A-Z][A-Za-z0-9&.,\s]{2,45}?\s+(?:Pvt\.?\s*Ltd\.?|Ltd\.?|Corporation|Corp\.?|Inc\.?|LLC|LLP|GmbH|Solutions|Technologies|Holdings|Group|Enterprise|Systems))\b/g,
+      /(?:by and between|between|Purchaser|Supplier|Vendor|Client|Customer):\s*([A-Z][A-Za-z0-9&.,\s]{2,40}?)(?:,|\n|\.|\(|\s+an\b)/g
+    ];
+    for (const pat of orgPatterns) {
+      let match;
+      while ((match = pat.exec(documentText)) !== null) {
+        const raw = match[1].trim();
+        if (raw && raw.length > 3 && !foundNames.has(raw.toLowerCase())) {
+          foundNames.add(raw.toLowerCase());
+          entities.push({
+            id: `ent-${Date.now()}-${entities.length}`,
+            name: raw,
+            type: "Organization",
+            mentions_count: 1,
+            linked_entity_id: `ORG-${raw.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase()}`,
+            linked_entity_name: raw,
+            confidence: 0.96,
+            status: "Verified",
+            source_doc_id: docId,
+            source_doc_name: docName,
+            source_page: 1,
+            evidence_text: documentText.slice(Math.max(0, match.index - 20), Math.min(documentText.length, match.index + 80)).trim(),
+            properties: { Category: "Corporate Entity" }
+          });
+        }
+      }
     }
 
-    if (lower.includes("xyz corporation")) {
-      entities.push({
-        id: `ent-${Date.now()}-2`,
-        name: "XYZ Corporation",
-        type: "Organization",
-        mentions_count: 12,
-        linked_entity_id: "ORG-1028",
-        linked_entity_name: "XYZ Corp Enterprise Electronics",
-        confidence: 0.95,
-        status: "Verified",
-        source_doc_id: docId,
-        source_doc_name: docName,
-        source_page: 2,
-        evidence_text: "...supply agreement with XYZ Corporation for the purchase of 500 Dell PowerEdge servers...",
-        properties: { Industry: "Hardware & Manufacturing", Region: "Asia Pacific" }
-      });
+    // 2. Contracts / Invoices
+    const docRefRegex = /\b((?:Contract|Agreement|Invoice|INV|PO|Purchase Order)[\s#\-:]+[A-Za-z0-9\-_]{2,20})\b/gi;
+    let refMatch;
+    while ((refMatch = docRefRegex.exec(documentText)) !== null) {
+      const raw = refMatch[1].trim();
+      if (!foundNames.has(raw.toLowerCase())) {
+        foundNames.add(raw.toLowerCase());
+        const isInv = raw.toLowerCase().includes("inv");
+        entities.push({
+          id: `ent-${Date.now()}-${entities.length}`,
+          name: raw,
+          type: isInv ? "Invoice" : "Contract",
+          mentions_count: 1,
+          linked_entity_id: `${isInv ? 'INV' : 'CTR'}-${raw.replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase()}`,
+          linked_entity_name: raw,
+          confidence: 0.98,
+          status: "Verified",
+          source_doc_id: docId,
+          source_doc_name: docName,
+          source_page: 1,
+          evidence_text: documentText.slice(Math.max(0, refMatch.index - 20), Math.min(documentText.length, refMatch.index + 80)).trim(),
+          properties: { Category: isInv ? "Billing Record" : "Commercial Instrument" }
+        });
+      }
     }
 
-    if (lower.includes("dell poweredge") || lower.includes("servers")) {
-      entities.push({
-        id: `ent-${Date.now()}-3`,
-        name: "Dell PowerEdge servers",
-        type: "Product",
-        mentions_count: 14,
-        linked_entity_id: "PROD-509",
-        linked_entity_name: "Dell PowerEdge Enterprise Rack Server",
-        confidence: 0.97,
-        status: "Verified",
-        source_doc_id: docId,
-        source_doc_name: docName,
-        source_page: 2,
-        evidence_text: "...for the purchase of 500 Dell PowerEdge servers worth INR 2.5 crore.",
-        properties: { Category: "Data Center Compute", OEM: "Dell Technologies" }
-      });
+    // 3. Products
+    const prodRegex = /\b([A-Z][a-zA-Z0-9\-_]+(?:\s+[A-Za-z0-9\-_]+)*\s+(?:Server|Rack|Cluster|Switch|Router|Processor|Software|Platform|Service|Hardware|License|Solution|Workstation|Laptop|App|Device)s?)\b/gi;
+    let prodMatch;
+    while ((prodMatch = prodRegex.exec(documentText)) !== null) {
+      const raw = prodMatch[1].trim();
+      if (!foundNames.has(raw.toLowerCase())) {
+        foundNames.add(raw.toLowerCase());
+        entities.push({
+          id: `ent-${Date.now()}-${entities.length}`,
+          name: raw,
+          type: "Product",
+          mentions_count: 1,
+          linked_entity_id: `PROD-${raw.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase()}`,
+          linked_entity_name: raw,
+          confidence: 0.95,
+          status: "Verified",
+          source_doc_id: docId,
+          source_doc_name: docName,
+          source_page: 1,
+          evidence_text: documentText.slice(Math.max(0, prodMatch.index - 20), Math.min(documentText.length, prodMatch.index + 80)).trim(),
+          properties: { Category: "Commercial Line Item" }
+        });
+      }
     }
 
-    if (lower.includes("john smith")) {
-      entities.push({
-        id: `ent-${Date.now()}-4`,
-        name: "John Smith",
-        type: "Person",
-        mentions_count: 4,
-        linked_entity_id: null,
-        linked_entity_name: null,
-        confidence: 0.82,
-        status: "Needs Review",
-        source_doc_id: docId,
-        source_doc_name: docName,
-        source_page: 2,
-        evidence_text: "The agreement was signed by John Smith on 15 March 2026...",
-        properties: { Role: "Authorised Signatory" }
-      });
+    // 4. Persons
+    const personRegex = /(?:signed by|signatory:?|Signatory:?|Director:?|Manager:?|Representative:?|Signed:?)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)/g;
+    let personMatch;
+    while ((personMatch = personRegex.exec(documentText)) !== null) {
+      const raw = personMatch[1].trim();
+      if (!foundNames.has(raw.toLowerCase()) && raw.length > 4) {
+        foundNames.add(raw.toLowerCase());
+        const isUnmatched = documentText.toLowerCase().includes("signatory");
+        entities.push({
+          id: `ent-${Date.now()}-${entities.length}`,
+          name: raw,
+          type: "Person",
+          mentions_count: 1,
+          linked_entity_id: isUnmatched ? null : `PER-${Date.now()}`,
+          linked_entity_name: isUnmatched ? null : raw,
+          confidence: isUnmatched ? 0.84 : 0.96,
+          status: isUnmatched ? "Needs Review" : "Verified",
+          source_doc_id: docId,
+          source_doc_name: docName,
+          source_page: 1,
+          evidence_text: documentText.slice(Math.max(0, personMatch.index - 20), Math.min(documentText.length, personMatch.index + 80)).trim(),
+          properties: { Designation: "Signatory" }
+        });
+      }
     }
 
-    if (lower.includes("2.5 crore") || lower.includes("inr")) {
-      entities.push({
-        id: `ent-${Date.now()}-5`,
-        name: "INR 2.5 crore",
-        type: "Money",
-        mentions_count: 6,
-        linked_entity_id: "MON-25M",
-        linked_entity_name: "₹25,000,000 INR",
-        confidence: 0.99,
-        status: "Verified",
-        source_doc_id: docId,
-        source_doc_name: docName,
-        source_page: 2,
-        evidence_text: "...worth INR 2.5 crore.",
-        properties: { NumericValue: 25000000, Currency: "INR" }
-      });
+    // 5. Money
+    const moneyRegex = /((?:INR|₹|USD|\$|EUR|€|GBP|£)\s*[\d,]+(?:\.\d+)?(?:\s*(?:crore|lakh|million|billion|k))?)/gi;
+    let moneyMatch;
+    while ((moneyMatch = moneyRegex.exec(documentText)) !== null) {
+      const raw = moneyMatch[1].trim();
+      if (!foundNames.has(raw.toLowerCase())) {
+        foundNames.add(raw.toLowerCase());
+        entities.push({
+          id: `ent-${Date.now()}-${entities.length}`,
+          name: raw,
+          type: "Money",
+          mentions_count: 1,
+          linked_entity_id: `MON-${Date.now().toString().slice(-4)}`,
+          linked_entity_name: raw,
+          confidence: 0.99,
+          status: "Verified",
+          source_doc_id: docId,
+          source_doc_name: docName,
+          source_page: 1,
+          evidence_text: documentText.slice(Math.max(0, moneyMatch.index - 20), Math.min(documentText.length, moneyMatch.index + 80)).trim(),
+          properties: { Value: raw }
+        });
+      }
     }
 
-    if (lower.includes("15 march 2026")) {
-      entities.push({
-        id: `ent-${Date.now()}-6`,
-        name: "15 March 2026",
-        type: "Date",
-        mentions_count: 8,
-        linked_entity_id: "DATE-20260315",
-        linked_entity_name: "2026-03-15 ISO",
-        confidence: 0.98,
-        status: "Verified",
-        source_doc_id: docId,
-        source_doc_name: docName,
-        source_page: 2,
-        evidence_text: "The agreement was signed by John Smith on 15 March 2026...",
-        properties: { StandardDate: "2026-03-15" }
-      });
-    }
-
-    if (lower.includes("15 march 2028")) {
-      entities.push({
-        id: `ent-${Date.now()}-7`,
-        name: "15 March 2028",
-        type: "Date",
-        mentions_count: 5,
-        linked_entity_id: "DATE-20280315",
-        linked_entity_name: "2028-03-15 ISO",
-        confidence: 0.98,
-        status: "Verified",
-        source_doc_id: docId,
-        source_doc_name: docName,
-        source_page: 2,
-        evidence_text: "...and is valid until 15 March 2028.",
-        properties: { StandardDate: "2028-03-15" }
-      });
-    }
-
-    return entities.length > 0 ? entities : INITIAL_ENTITIES.slice(0, 5);
+    return entities;
   }
 
   async extractRelationships(documentText, entities = [], docId = "doc-custom", docName = "Uploaded_Document") {
     try {
       const res = await fetch(`${this.apiBase}/documents/${docId}/relationships`);
       if (res.ok) return await res.json();
-    } catch (_) {}
+    } catch (_) { }
 
-    return INITIAL_RELATIONSHIPS.filter(r => r.source_doc_name === "Contract_001.pdf");
+    return [];
   }
 
   async extractFacts(documentText, docId = "doc-custom", docName = "Uploaded_Document") {
     try {
       const res = await fetch(`${this.apiBase}/documents/${docId}/facts`);
       if (res.ok) return await res.json();
-    } catch (_) {}
+    } catch (_) { }
 
-    return INITIAL_FACTS.filter(f => f.source_doc_name === "Contract_001.pdf");
+    return [];
   }
 
   async resolveEntities(entities, semanticModel) {
@@ -198,6 +218,10 @@ class AIService {
       ...e,
       status: e.linked_entity_id ? "Verified" : "Needs Review"
     }));
+  }
+
+  async queryKnowledge(query, knowledgeBase = null) {
+    return this.answerKnowledgeQuery(query, knowledgeBase);
   }
 
   async answerKnowledgeQuery(query, knowledgeBase = null) {
@@ -208,133 +232,85 @@ class AIService {
         body: JSON.stringify({ query })
       });
       if (res.ok) return await res.json();
-    } catch (_) {}
+    } catch (_) { }
 
-    // Client-side structured answer simulation
+    // Client fallback: Dynamic grounded search
     const qLower = query.toLowerCase();
-    const steps = [
-      {
-        step: 1,
-        name: "Question Understanding",
-        description: "Analyze semantic intent, target predicate, and constraint filters.",
-        detail: `Detected query intent regarding contracts, values, or entities in prompt: "${query}"`
-      },
-      {
-        step: 2,
-        name: "Entity Identification",
-        description: "Ground named entities in the query against master semantic model.",
-        detail: "Identified 'ABC Technologies' -> Grounded to ORG-1024 (ABC Technologies Pvt. Ltd.)"
-      },
-      {
-        step: 3,
-        name: "Knowledge Retrieval",
-        description: "Traverse relationships in knowledge graph across contracts, suppliers, and terms.",
-        detail: "Traversed: ABC Technologies (ORG-1024) -[SIGNED]-> Contract C001 -[CONTAINS]-> Dell PowerEdge servers"
-      },
-      {
-        step: 4,
-        name: "Evidence Collection",
-        description: "Assemble verbatim document citations and verify confidence scores.",
-        detail: "Gathered direct statements from Contract_001.pdf (Page 2) with 98% average confidence."
-      },
-      {
-        step: 5,
-        name: "Answer Generation",
-        description: "Synthesize factual answer strictly constrained by evidence without speculation.",
-        detail: "Generated evidence-backed answer with 0 hallucinated claims."
-      }
-    ];
+    const queryTokens = qLower.split(/\s+/).filter(w => w.length > 2);
+
+    if (this.entities.length === 0 && this.facts.length === 0) {
+      return {
+        query,
+        answer: "The knowledge base is currently empty. Please upload a business document to extract entities, relationships, and business facts.",
+        confidence: 0.0,
+        pipeline_steps: [
+          { step: 1, name: "Question Understanding", description: "Processed query intent.", detail: `Query: '${query}'` },
+          { step: 2, name: "Entity Identification", description: "Searched knowledge base for named entities.", detail: "0 matching entities found." },
+          { step: 3, name: "Knowledge Retrieval", description: "Traversed graph connections.", detail: "0 active nodes in graph." },
+          { step: 4, name: "Evidence Collection", description: "Gathered verbatim source citations.", detail: "No documents currently ingested." },
+          { step: 5, name: "Answer Generation", description: "Safeguarded against hallucination.", detail: "Zero unsupported statements returned." }
+        ],
+        matched_entities: [],
+        matched_facts: [],
+        evidence_citations: []
+      };
+    }
+
+    const matchedEntities = this.entities.filter(e =>
+      queryTokens.some(t => e.name.toLowerCase().includes(t) || e.type.toLowerCase().includes(t))
+    );
+    const matchedFacts = this.facts.filter(f =>
+      queryTokens.some(t => f.predicate.toLowerCase().includes(t) || f.value.toLowerCase().includes(t) || f.subject_name.toLowerCase().includes(t))
+    );
 
     let answer = "";
-    let matched_entities = [];
-    let matched_facts = [];
-    let evidence_citations = [];
-
-    if (qLower.includes("who signed") || qLower.includes("sign")) {
-      answer = "Contract C001 was signed by **John Smith** (Authorised Signatory for ABC Technologies Pvt. Ltd.) and **Robert Vance** (Managing Director for XYZ Corporation) on 15 March 2026.";
-      matched_entities = this.entities.filter(e => ["John Smith", "Contract C001", "Robert Vance"].includes(e.name));
-      matched_facts = this.facts.filter(f => ["Start Date", "Governing Jurisdiction"].includes(f.predicate));
-      evidence_citations = [
-        {
-          source: "Contract_001.pdf (Page 2 & 4)",
-          quote: "The agreement was signed by John Smith on 15 March 2026... For XYZ Corporation: Signed: Robert Vance",
-          confidence: 0.98
-        }
-      ];
-    } else if (qLower.includes("value") || qLower.includes("worth") || qLower.includes("how much") || qLower.includes("total")) {
-      answer = "The total value of Contract C001 between ABC Technologies Pvt. Ltd. and XYZ Corporation is **INR 2.5 Crore (₹25,000,000)**. An initial invoice (INV-2026-034) of **INR 1.0 Crore** has been issued for 200 delivered units.";
-      matched_entities = this.entities.filter(e => ["INR 2.5 crore", "Contract C001", "INR 1.0 Crore"].includes(e.name));
-      matched_facts = this.facts.filter(f => ["Contract Value", "Invoice Payable Amount", "Quantity"].includes(f.predicate));
-      evidence_citations = [
-        {
-          source: "Contract_001.pdf (Page 2)",
-          quote: "...for the purchase of 500 Dell PowerEdge servers worth INR 2.5 crore.",
-          confidence: 0.99
-        },
-        {
-          source: "Invoice_034.pdf (Page 1)",
-          quote: "Total amount payable: INR 1,00,00,000 (INR 1.0 Crore). Due date: 30 April 2026.",
-          confidence: 0.99
-        }
-      ];
-    } else if (qLower.includes("product") || qLower.includes("purchase") || qLower.includes("servers")) {
-      answer = "ABC Technologies Pvt. Ltd. purchased **500 Dell PowerEdge servers** configured with dual Intel Xeon processors, 256GB ECC DDR5 RAM, and redundant titanium power supplies under Contract C001.";
-      matched_entities = this.entities.filter(e => ["Dell PowerEdge servers", "ABC Technologies Pvt. Ltd.", "Contract C001"].includes(e.name));
-      matched_facts = this.facts.filter(f => ["Quantity", "Processor Architecture", "RAM Specification"].includes(f.predicate));
-      evidence_citations = [
-        {
-          source: "Contract_001.pdf (Page 2)",
-          quote: "ABC Technologies Pvt. Ltd. entered into a supply agreement with XYZ Corporation for the purchase of 500 Dell PowerEdge servers...",
-          confidence: 0.97
-        }
-      ];
-    } else if (qLower.includes("expire") || qLower.includes("expiry") || qLower.includes("2028") || qLower.includes("valid")) {
-      answer = "Contract C001 is valid until **15 March 2028** according to the executed agreement. *Note:* A potential reporting discrepancy in Annual_Report_2026.pdf cites June 2028, currently flagged for human review.";
-      matched_entities = this.entities.filter(e => ["15 March 2028", "Contract C001", "June 2028"].includes(e.name));
-      matched_facts = this.facts.filter(f => f.predicate.includes("Expiry"));
-      evidence_citations = [
-        {
-          source: "Contract_001.pdf (Page 2)",
-          quote: "...and is valid until 15 March 2028.",
-          confidence: 0.98
-        },
-        {
-          source: "Annual_Report_2026.pdf (Page 7)",
-          quote: "...with an operational expiration recorded as June 2028 (Under Review).",
-          confidence: 0.74
-        }
-      ];
+    if (matchedFacts.length > 0) {
+      const summaries = matchedFacts.slice(0, 3).map(f => `**${f.predicate}** is **${f.value}** (${f.source_doc_name})`);
+      answer = `Based on extracted business facts: ${summaries.join('; ')}.`;
+    } else if (matchedEntities.length > 0) {
+      const summaries = matchedEntities.slice(0, 4).map(e => `**${e.name}** (${e.type})`);
+      answer = `Identified entities matching your query: ${summaries.join(', ')}.`;
     } else {
-      answer = "ABC Technologies Pvt. Ltd. currently holds **Contract C001** (Supply Agreement with XYZ Corporation for 500 Dell PowerEdge servers, value INR 2.5 Crore / ₹2.5 Cr, valid until 15 March 2028). 200 units have been billed under Invoice INV-2026-034.";
-      matched_entities = this.entities.slice(0, 4);
-      matched_facts = this.facts.slice(0, 4);
-      evidence_citations = [
-        {
-          source: "Contract_001.pdf (Page 2)",
-          quote: "ABC Technologies Pvt. Ltd. entered into a supply agreement with XYZ Corporation for the purchase of 500 Dell PowerEdge servers worth INR 2.5 crore.",
-          confidence: 0.98
-        }
-      ];
+      answer = `Found ${this.entities.length} entities and ${this.facts.length} facts in the knowledge base, but none specifically match the query terms in '${query}'.`;
     }
+
+    const citations = [...matchedFacts, ...matchedEntities].slice(0, 3).map(item => ({
+      source: `${item.source_doc_name || 'Document'} (Page ${item.source_page || 1})`,
+      quote: item.evidence_text || item.value || item.name,
+      confidence: item.confidence || 0.95
+    }));
 
     return {
       query,
       answer,
-      confidence: 0.96,
-      pipeline_steps: steps,
-      matched_entities,
-      matched_facts,
-      evidence_citations
+      confidence: citations.length > 0 ? 0.96 : 0.70,
+      pipeline_steps: [
+        { step: 1, name: "Question Understanding", description: "Analyzed query intent and target constraints.", detail: `Query: '${query}'` },
+        { step: 2, name: "Entity Identification", description: "Grounded named entities in query.", detail: `Matched ${matchedEntities.length} entities.` },
+        { step: 3, name: "Knowledge Retrieval", description: "Traversed knowledge graph paths.", detail: `Traversed ${matchedFacts.length} structured facts.` },
+        { step: 4, name: "Evidence Collection", description: "Gathered verbatim source citations.", detail: `Collected ${citations.length} verified citations.` },
+        { step: 5, name: "Answer Generation", description: "Synthesized answer with zero hallucination.", detail: "Generated grounded response." }
+      ],
+      matched_entities: matchedEntities.slice(0, 5),
+      matched_facts: matchedFacts.slice(0, 5),
+      evidence_citations: citations
     };
   }
 
-  // --- API / STATE WRAPPERS ---
+  // --- REPOSITORY & API INTEGRATION METHODS ---
 
   async getDocuments() {
     try {
       const res = await fetch(`${this.apiBase}/documents`);
-      if (res.ok) return await res.json();
-    } catch (_) {}
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          this.documents = data;
+          try { window.localStorage.setItem('kf_documents', JSON.stringify(data)); } catch (_) {}
+          return data;
+        }
+      }
+    } catch (_) { }
     return this.documents;
   }
 
@@ -342,11 +318,11 @@ class AIService {
     try {
       const res = await fetch(`${this.apiBase}/documents/${docId}`);
       if (res.ok) return await res.json();
-    } catch (_) {}
-    return this.documents.find(d => d.id === docId) || this.documents[0];
+    } catch (_) { }
+    return this.documents.find(d => d.id === docId) || null;
   }
 
-  async uploadDemoDocument() {
+  async uploadDemoDocument(demoType = "contract") {
     try {
       const formData = new FormData();
       formData.append('is_demo', 'true');
@@ -356,17 +332,14 @@ class AIService {
       });
       if (res.ok) {
         const data = await res.json();
+        if (data.document) {
+          this.documents.unshift(data.document);
+        }
         return data.document;
       }
-    } catch (_) {}
+    } catch (_) { }
 
-    const newDoc = {
-      ...INITIAL_DOCUMENTS[0],
-      id: `doc-${Date.now().toString().slice(-4)}`,
-      uploaded_at: new Date().toISOString().split('T')[0]
-    };
-    this.documents.unshift(newDoc);
-    return newDoc;
+    return null;
   }
 
   async uploadCustomDocument(file) {
@@ -379,36 +352,39 @@ class AIService {
       });
       if (res.ok) {
         const data = await res.json();
+        if (data.document) {
+          this.documents.unshift(data.document);
+        }
         return data.document;
       }
-    } catch (_) {}
+    } catch (_) { }
 
-    // Fallback: parse text client side if txt
+    // Fallback client extraction if backend unreachable
+    const docId = `doc-${Date.now().toString().slice(-4)}`;
+    const text = await file.text().catch(() => "Uploaded document content.");
+    const extractedEntities = await this.extractEntities(text, docId, file.name);
+
     const newDoc = {
-      id: `doc-${Date.now().toString().slice(-4)}`,
+      id: docId,
       filename: file.name,
       file_type: file.name.split('.').pop().toUpperCase(),
-      file_size: `${Math.round(file.size / 1024) || 12} KB`,
-      uploaded_at: new Date().toISOString().split('T')[0],
+      file_size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
+      uploaded_at: "Today",
       status: "Completed",
-      pages_count: 2,
-      chunks_count: 6,
-      entities_count: 5,
-      relationships_count: 4,
-      facts_count: 5,
+      pages_count: 1,
+      chunks_count: 4,
+      entities_count: extractedEntities.length,
+      relationships_count: 0,
+      facts_count: 0,
       confidence_score: 0.95,
-      needs_review_count: 1,
-      summary: `Uploaded ${file.name} - Extracted entities, relationships, and business facts with source traceability.`,
-      text_content: "Uploaded document content parsed into structured knowledge representations.",
-      pages: [
-        {
-          page_number: 1,
-          title: "Page 1",
-          text: "Uploaded document content parsed into structured knowledge representations."
-        }
-      ]
+      needs_review_count: extractedEntities.filter(e => e.status === "Needs Review").length,
+      summary: `Extracted ${extractedEntities.length} entities from ${file.name}.`,
+      text_content: text,
+      pages: [{ page_number: 1, title: file.name, text }]
     };
+
     this.documents.unshift(newDoc);
+    this.entities.push(...extractedEntities);
     return newDoc;
   }
 
@@ -416,8 +392,17 @@ class AIService {
     try {
       const url = filter && filter !== "All" ? `${this.apiBase}/entities?type_filter=${filter}` : `${this.apiBase}/entities`;
       const res = await fetch(url);
-      if (res.ok) return await res.json();
-    } catch (_) {}
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          this.entities = data;
+          if (!filter || filter === "All") {
+            try { window.localStorage.setItem('kf_entities', JSON.stringify(data)); } catch (_) {}
+          }
+          return data;
+        }
+      }
+    } catch (_) { }
 
     if (filter && filter !== "All") {
       return this.entities.filter(e => e.type.toLowerCase() === filter.toLowerCase());
@@ -428,24 +413,45 @@ class AIService {
   async getRelationships() {
     try {
       const res = await fetch(`${this.apiBase}/relationships`);
-      if (res.ok) return await res.json();
-    } catch (_) {}
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          this.relationships = data;
+          try { window.localStorage.setItem('kf_relationships', JSON.stringify(data)); } catch (_) {}
+          return data;
+        }
+      }
+    } catch (_) { }
     return this.relationships;
   }
 
   async getFacts() {
     try {
       const res = await fetch(`${this.apiBase}/facts`);
-      if (res.ok) return await res.json();
-    } catch (_) {}
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          this.facts = data;
+          try { window.localStorage.setItem('kf_facts', JSON.stringify(data)); } catch (_) {}
+          return data;
+        }
+      }
+    } catch (_) { }
     return this.facts;
   }
 
   async getEvidence() {
     try {
       const res = await fetch(`${this.apiBase}/evidence`);
-      if (res.ok) return await res.json();
-    } catch (_) {}
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          this.evidence = data;
+          try { window.localStorage.setItem('kf_evidence', JSON.stringify(data)); } catch (_) {}
+          return data;
+        }
+      }
+    } catch (_) { }
     return this.evidence;
   }
 
@@ -453,38 +459,25 @@ class AIService {
     try {
       const res = await fetch(`${this.apiBase}/knowledge/graph`);
       if (res.ok) return await res.json();
-    } catch (_) {}
+    } catch (_) { }
 
-    // Client fallback graph nodes & edges
-    const nodes = this.entities.slice(0, 9).map((e, idx) => {
-      const positions = {
-        "ent-001": { x: 80, y: 140 },
-        "ent-002": { x: 780, y: 140 },
-        "ent-005": { x: 420, y: 280 },
-        "ent-003": { x: 420, y: 480 },
-        "ent-004": { x: 140, y: 440 },
-        "ent-006": { x: 720, y: 320 },
-        "ent-007": { x: 420, y: 100 },
-        "ent-008": { x: 620, y: 100 },
-        "ent-009": { x: 680, y: 480 },
-      };
-      return {
+    // Dynamic client fallback graph layout
+    const nodes = this.entities.slice(0, 24).map((e, idx) => ({
+      id: e.id,
+      type: 'customKnowledgeNode',
+      position: { x: 100 + (idx % 4) * 240, y: 80 + Math.floor(idx / 4) * 160 },
+      data: {
         id: e.id,
-        type: 'customKnowledgeNode',
-        position: positions[e.id] || { x: 100 + (idx % 3) * 260, y: 80 + Math.floor(idx / 3) * 160 },
-        data: {
-          id: e.id,
-          label: e.name,
-          type: e.type,
-          linkedId: e.linked_entity_id,
-          confidence: e.confidence,
-          status: e.status,
-          source: e.source_doc_name
-        }
-      };
-    });
+        label: e.name,
+        type: e.type,
+        linkedId: e.linked_entity_id,
+        confidence: e.confidence || 0.95,
+        status: e.status || "Verified",
+        source: e.source_doc_name || "Document"
+      }
+    }));
 
-    const edges = this.relationships.slice(0, 10).map(r => ({
+    const edges = this.relationships.slice(0, 30).map(r => ({
       id: r.id,
       source: r.source_entity_id,
       target: r.target_entity_id,
@@ -498,11 +491,11 @@ class AIService {
       data: {
         id: r.id,
         relation_type: r.relation_type,
-        confidence: r.confidence,
-        status: r.status,
-        evidence: r.evidence_text,
-        source_doc: r.source_doc_name,
-        source_page: r.source_page,
+        confidence: r.confidence || 0.95,
+        status: r.status || "Supported",
+        evidence: r.evidence_text || "",
+        source_doc: r.source_doc_name || "Document",
+        source_page: r.source_page || 1,
         warning: r.warning
       }
     }));
@@ -513,8 +506,12 @@ class AIService {
   async getReviewItems() {
     try {
       const res = await fetch(`${this.apiBase}/review/items`);
-      if (res.ok) return await res.json();
-    } catch (_) {}
+      if (res.ok) {
+        const data = await res.json();
+        this.reviewItems = data;
+        return data;
+      }
+    } catch (_) { }
     return this.reviewItems;
   }
 
@@ -522,19 +519,10 @@ class AIService {
     try {
       const res = await fetch(`${this.apiBase}/review/${itemId}/approve`, { method: 'POST' });
       if (res.ok) return await res.json();
-    } catch (_) {}
+    } catch (_) { }
 
     const item = this.reviewItems.find(r => r.id === itemId);
-    if (item) {
-      item.status = "Approved";
-      if (item.category === "Unmatched" && item.match_id) {
-        const ent = this.entities.find(e => e.name.includes(item.extracted_text));
-        if (ent) {
-          ent.linked_entity_id = item.match_id;
-          ent.status = "Verified";
-        }
-      }
-    }
+    if (item) item.status = "Resolved";
     return { success: true, item };
   }
 
@@ -542,20 +530,22 @@ class AIService {
     try {
       const res = await fetch(`${this.apiBase}/review/${itemId}/reject`, { method: 'POST' });
       if (res.ok) return await res.json();
-    } catch (_) {}
+    } catch (_) { }
 
     const item = this.reviewItems.find(r => r.id === itemId);
-    if (item) {
-      item.status = "Rejected";
-    }
+    if (item) item.status = "Rejected";
     return { success: true, item };
   }
 
   async getContradictions() {
     try {
       const res = await fetch(`${this.apiBase}/contradictions`);
-      if (res.ok) return await res.json();
-    } catch (_) {}
+      if (res.ok) {
+        const data = await res.json();
+        this.contradictions = data;
+        return data;
+      }
+    } catch (_) { }
     return this.contradictions;
   }
 
@@ -569,12 +559,12 @@ class AIService {
         body: formData
       });
       if (res.ok) return await res.json();
-    } catch (_) {}
+    } catch (_) { }
 
     const item = this.contradictions.find(c => c.id === contraId);
     if (item) {
-      item.status = `Resolved (${choice === 'doc_a' ? 'Doc A' : 'Doc B'})`;
-      item.resolution_note = note || `User confirmed ${choice === 'doc_a' ? 'Doc A' : 'Doc B'} as authoritative reference.`;
+      item.status = `Resolved (${choice.toUpperCase()})`;
+      item.resolution_note = note || `Verified ${choice} as authoritative reference.`;
     }
     return { success: true, contradiction: item };
   }
@@ -583,7 +573,7 @@ class AIService {
     try {
       const res = await fetch(`${this.apiBase}/semantic-model`);
       if (res.ok) return await res.json();
-    } catch (_) {}
+    } catch (_) { }
     return this.semanticModel;
   }
 
@@ -591,59 +581,158 @@ class AIService {
     try {
       const res = await fetch(`${this.apiBase}/analytics`);
       if (res.ok) return await res.json();
-    } catch (_) {}
-    return this.analytics;
+    } catch (_) { }
+
+    // Compute live metrics dynamically
+    const totalDocs = this.documents.length;
+    const totalEnts = this.entities.length;
+    const totalRels = this.relationships.length;
+    const totalFacts = this.facts.length;
+
+    const typeCounts = {};
+    for (const e of this.entities) {
+      const t = e.type || "Other";
+      typeCounts[t] = (typeCounts[t] || 0) + 1;
+    }
+
+    const typeColors = {
+      Organization: "#3b82f6", Product: "#10b981", Contract: "#f59e0b",
+      Person: "#8b5cf6", Money: "#14b8a6", Invoice: "#06b6d4",
+      Date: "#64748b", Location: "#ec4899"
+    };
+
+    return {
+      kpis: {
+        documents_processed: totalDocs,
+        documents_processed_today: totalDocs,
+        entities_extracted: totalEnts,
+        entities_today: totalEnts,
+        relationships_discovered: totalRels,
+        relationships_today: totalRels,
+        facts_extracted: totalFacts,
+        facts_today: totalFacts
+      },
+      extraction_activity_timeline: totalDocs > 0 ? [{ date: "Today", facts: totalFacts, entities: totalEnts }] : [],
+      entities_by_type: ["Organization", "Product", "Contract", "Person", "Money", "Invoice", "Date", "Location"].map(name => ({
+        name,
+        count: typeCounts[name] || 0,
+        color: typeColors[name] || "#64748b"
+      })),
+      confidence_distribution: [
+        { range: "95-100%", count: this.entities.filter(e => (e.confidence || 0) >= 0.95).length },
+        { range: "90-94%", count: this.entities.filter(e => (e.confidence || 0) >= 0.90 && (e.confidence || 0) < 0.95).length },
+        { range: "80-89%", count: this.entities.filter(e => (e.confidence || 0) >= 0.80 && (e.confidence || 0) < 0.90).length },
+        { range: "< 80%", count: this.entities.filter(e => (e.confidence || 0) < 0.80).length }
+      ],
+      human_review_metrics: {
+        pending_reviews: this.reviewItems.filter(r => r.status === "Pending").length,
+        resolved_reviews: this.reviewItems.filter(r => r.status === "Resolved").length,
+        rejected_hallucinations: this.reviewItems.filter(r => r.status === "Rejected").length
+      }
+    };
   }
 
   async getSettings() {
     try {
       const res = await fetch(`${this.apiBase}/settings`);
       if (res.ok) return await res.json();
-    } catch (_) {}
+    } catch (_) { }
     return this.settings;
   }
 
-  async updateSettings(newSettings) {
+  async saveSettings(newSettings) {
+    this.settings = { ...this.settings, ...newSettings };
     try {
       const res = await fetch(`${this.apiBase}/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newSettings)
+        body: JSON.stringify(this.settings)
       });
       if (res.ok) return await res.json();
-    } catch (_) {}
-    this.settings = { ...this.settings, ...newSettings };
+    } catch (_) { }
     return { success: true, settings: this.settings };
   }
 
-  async search(query) {
-    if (!query || query.trim().length < 2) {
-      return { documents: [], entities: [], relationships: [], facts: [] };
-    }
-    try {
-      const res = await fetch(`${this.apiBase}/search?q=${encodeURIComponent(query)}`);
-      if (res.ok) return await res.json();
-    } catch (_) {}
+  // --- NEO4J & INVOICE DATASET INTEGRATION ---
 
-    const term = query.toLowerCase().trim();
-    return {
-      documents: this.documents
-        .filter(d => d.filename.toLowerCase().includes(term) || d.summary.toLowerCase().includes(term))
-        .map(d => ({ id: d.id, title: d.filename, type: "document", subtitle: d.summary.slice(0, 90) }))
-        .slice(0, 5),
-      entities: this.entities
-        .filter(e => e.name.toLowerCase().includes(term) || e.type.toLowerCase().includes(term))
-        .map(e => ({ id: e.id, title: e.name, type: e.type, subtitle: `Linked: ${e.linked_entity_id || 'Unmatched'} • ${Math.round(e.confidence * 100)}% conf` }))
-        .slice(0, 6),
-      relationships: this.relationships
-        .filter(r => r.source_entity_name.toLowerCase().includes(term) || r.target_entity_name.toLowerCase().includes(term) || r.relation_type.toLowerCase().includes(term))
-        .map(r => ({ id: r.id, title: `${r.source_entity_name} → ${r.relation_type} → ${r.target_entity_name}`, type: "relationship", subtitle: `${r.status} • ${r.source_doc_name}` }))
-        .slice(0, 5),
-      facts: this.facts
-        .filter(f => f.subject_name.toLowerCase().includes(term) || f.predicate.toLowerCase().includes(term) || f.value.toLowerCase().includes(term))
-        .map(f => ({ id: f.id, title: `${f.subject_name}: ${f.predicate} = ${f.value}`, type: "fact", subtitle: `${f.status} • ${f.source_doc_name}` }))
-        .slice(0, 5)
-    };
+  async getNeo4jStatus() {
+    try {
+      const res = await fetch(`${this.apiBase}/neo4j/status`);
+      if (res.ok) return await res.json();
+    } catch (_) { }
+    return { connected: false, configured: false, message: "Backend offline" };
+  }
+
+  async configureNeo4j(config) {
+    try {
+      const res = await fetch(`${this.apiBase}/neo4j/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      return { connected: false, error: e.message };
+    }
+    return { connected: false, error: "Failed to configure Neo4j" };
+  }
+
+  async syncToNeo4j() {
+    try {
+      const res = await fetch(`${this.apiBase}/neo4j/sync`, { method: 'POST' });
+      if (res.ok) return await res.json();
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+    return { success: false, error: "Sync failed" };
+  }
+
+  async getInvoiceDatasetStatus() {
+    try {
+      const res = await fetch(`${this.apiBase}/invoices/dataset-status`);
+      if (res.ok) return await res.json();
+    } catch (_) { }
+    return { dataset_name: "katanaml-org/invoices-donut-data-v1", batch_available: 26, ocr_engine: "RapidOCR" };
+  }
+
+  async ingestInvoiceDataset(limit = 15, offset = 0) {
+    try {
+      const res = await fetch(`${this.apiBase}/invoices/ingest-dataset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ limit, offset })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        await this.getDocuments();
+        await this.getEntities();
+        await this.getRelationships();
+        await this.getFacts();
+        await this.getEvidence();
+        return data;
+      }
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+    return { success: false, error: "Ingestion failed" };
+  }
+
+  async ingestAllInvoices() {
+    try {
+      const res = await fetch(`${this.apiBase}/invoices/ingest-all`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        await this.getDocuments();
+        await this.getEntities();
+        await this.getRelationships();
+        await this.getFacts();
+        await this.getEvidence();
+        return data;
+      }
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
+    return { success: false, error: "Auto-ingestion failed" };
   }
 }
 

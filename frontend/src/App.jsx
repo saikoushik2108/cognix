@@ -6,10 +6,7 @@ import DashboardPage from './pages/DashboardPage';
 import DocumentsPage from './pages/DocumentsPage';
 import DocumentProcessingPage from './pages/DocumentProcessingPage';
 import DocumentInspectorPage from './pages/DocumentInspectorPage';
-import EntityExplorerPage from './pages/EntityExplorerPage';
-import RelationshipExplorerPage from './pages/RelationshipExplorerPage';
-import FactExplorerPage from './pages/FactExplorerPage';
-import EvidenceCenterPage from './pages/EvidenceCenterPage';
+import KnowledgeRepositoryPage from './pages/KnowledgeRepositoryPage';
 import KnowledgeGraphPage from './pages/KnowledgeGraphPage';
 import AskKnowledgePage from './pages/AskKnowledgePage';
 import ReviewCenterPage from './pages/ReviewCenterPage';
@@ -28,10 +25,11 @@ export default function App() {
           <Route path="documents" element={<DocumentsPage />} />
           <Route path="processing/:docId" element={<DocumentProcessingPage />} />
           <Route path="documents/inspector/:docId" element={<DocumentInspectorPage />} />
-          <Route path="knowledge/entities" element={<EntityExplorerPage />} />
-          <Route path="knowledge/relationships" element={<RelationshipExplorerPage />} />
-          <Route path="knowledge/facts" element={<FactExplorerPage />} />
-          <Route path="knowledge/evidence" element={<EvidenceCenterPage />} />
+          <Route path="knowledge" element={<KnowledgeRepositoryPage />} />
+          <Route path="knowledge/entities" element={<KnowledgeRepositoryPage />} />
+          <Route path="knowledge/relationships" element={<KnowledgeRepositoryPage />} />
+          <Route path="knowledge/facts" element={<KnowledgeRepositoryPage />} />
+          <Route path="knowledge/evidence" element={<KnowledgeRepositoryPage />} />
           <Route path="graph" element={<KnowledgeGraphPage />} />
           <Route path="ask" element={<AskKnowledgePage />} />
           <Route path="review" element={<ReviewCenterPage />} />

@@ -15,7 +15,7 @@ export default function ArchitecturePage() {
       description: "Extracts raw text streams, structural bounding boxes, and byte offsets directly from PDF, DOCX, or TXT documents using PyMuPDF and python-docx.",
       guarantee: "100% faithful representation of raw document text. No AI paraphrasing or hallucinations at byte level.",
       tech: "PyMuPDF (fitz) / python-docx / UTF-8 stream parser",
-      example: "Extracted 1,420 words from Contract_001.pdf with page index 1 & 2 markers."
+      example: "Extracted vector character stream and layout chunks with 100% byte fidelity."
     },
     {
       step: 2,
@@ -26,7 +26,7 @@ export default function ArchitecturePage() {
       description: "Identifies named real-world business entities (Organizations, Persons, Products, Invoices, Contracts) constrained strictly to the predefined Semantic Schema.",
       guarantee: "Entities must be anchored to exact substrings with character offsets in the extracted document text.",
       tech: "Structured JSON schema extraction / Prompt-constrained NER",
-      example: "'ABC Technologies Pvt. Ltd.' (Organization), 'Dell PowerEdge Servers' (Product)"
+      example: "[Corporate Enterprise] (Organization), [Hardware/Service] (Product)"
     },
     {
       step: 3,
@@ -35,9 +35,9 @@ export default function ArchitecturePage() {
       badgeClass: "badge-purple",
       icon: Share2,
       description: "Extracts directional semantic triples [Subject] → (PREDICATE) → [Object] explicitly described between extracted entities.",
-      guarantee: "Only explicitly stated relationships are extracted. Unverified assumptions (e.g. 'John Smith is CEO') are blocked or flagged.",
+      guarantee: "Only explicitly stated relationships are extracted. Unverified assumptions are blocked or flagged.",
       tech: "Ontology-guided triple parser / Schema validation",
-      example: "ABC Technologies → (SIGNED) → Contract C001"
+      example: "[Purchaser Org] → (SIGNED) → [Contract Ref]"
     },
     {
       step: 4,
@@ -48,7 +48,7 @@ export default function ArchitecturePage() {
       description: "Extracts discrete commercial, financial, and operational facts with structured property names, values, and units of measurement.",
       guarantee: "Every extracted fact requires an exact verbatim quotation as source evidence.",
       tech: "Key-value predicate extraction / Datatype normalization",
-      example: "Contract C001 · Contract Value = INR 2.5 Crore (Confidence 98%)"
+      example: "[Contract Ref] · Commercial Value = [Monetary Consideration]"
     },
     {
       step: 5,
@@ -59,7 +59,7 @@ export default function ArchitecturePage() {
       description: "Performs deterministic substring verification: validates that the quoted evidence string actually exists character-for-character within the extracted document text.",
       guarantee: "Any claim lacking an exact source quotation is immediately flagged as 'Evidence Unavailable · Requires Review'.",
       tech: "Deterministic string matching / Substring offset locator",
-      example: "Verified 'worth INR 2.5 crore' at Contract_001.pdf (Page 2, Char 842-864)"
+      example: "Exact verbatim substring verified at character offsets with source page citation."
     },
     {
       step: 6,
@@ -70,7 +70,7 @@ export default function ArchitecturePage() {
       description: "Normalizes company names, strips legal suffixes, executes rapid fuzzy string matching (Levenshtein / Token Sort), and links variations to canonical registry IDs.",
       guarantee: "High confidence matches (≥90%) are linked automatically. Borderline matches require Human-in-the-Loop review.",
       tech: "Fuzzy matching / Deterministic legal entity normalization",
-      example: "'ABC Technologies Pvt Ltd' → linked to ORG-1024 ('ABC Technologies Pvt. Ltd.')"
+      example: "[Entity Variant] → linked to canonical master record [ORG-XXXX]"
     },
     {
       step: 7,
@@ -81,7 +81,7 @@ export default function ArchitecturePage() {
       description: "Stores canonical entities, resolved relationships, validated facts, and verified evidence into indexed graph models ready for visual exploration and JSON export.",
       guarantee: "Pure deterministic graph serialization. Graph edges mirror validated evidence triples 1-to-1.",
       tech: "In-memory Graph Engine / React Flow / JSON Knowledge Graph Exporter",
-      example: "Knowledge graph constructed with 6 canonical nodes and 5 directed edges."
+      example: "Knowledge graph nodes and directed relationship edges serialized."
     },
     {
       step: 8,
@@ -92,7 +92,7 @@ export default function ArchitecturePage() {
       description: "Answers user questions by first performing deterministic graph traversal to retrieve verified facts and citations, then generating answers strictly from that evidence.",
       guarantee: "Zero unsupported answers. Includes a transparent 'How did we get this answer?' audit trail.",
       tech: "Graph Path Retrieval + Grounded Synthesizer",
-      example: "Query: 'What is the contract value?' → Answer: 'INR 2.5 Crore' (Source: Contract_001.pdf Page 2)"
+      example: "Query: 'What is the contract value?' → Grounded Answer with verified document citation."
     }
   ];
 

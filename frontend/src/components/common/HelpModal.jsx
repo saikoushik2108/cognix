@@ -10,9 +10,9 @@ export default function HelpModal({ isOpen, onClose }) {
     { num: 3, title: "Processing Pipeline", desc: "Observe the 8-stage extraction flow: Text Extraction → Entity Recognition → Relationship Inference → Fact Structuring → Evidence Attachment → Entity Resolution." },
     { num: 4, title: "Document Inspector", desc: "3-column viewer: navigate pages, inspect interactive entity highlights, view verbatim quotes." },
     { num: 5, title: "Knowledge Graph", desc: "Explore the React Flow interactive graph: zoom, pan, search, filter by entity type or confidence." },
-    { num: 6, title: "Review Center", desc: "Handle ambiguous entities (ORG-1024 link) and reject unsupported inferences ('John Smith CEO_OF') to prevent hallucinations." },
-    { num: 7, title: "Ask Knowledge", desc: "Test natural language queries (e.g. 'What contracts does ABC Technologies have?') and inspect 'How did we get this answer?'" },
-    { num: 8, title: "Contradiction Detection", desc: "Examine conflicting expiry dates between Contract C001 (15 Mar 2028) and Annual Report (June 2028)." }
+    { num: 6, title: "Review Center", desc: "Handle ambiguous entities and reject unsupported inferences to safeguard knowledge integrity." },
+    { num: 7, title: "Ask Knowledge", desc: "Test evidence-backed natural language queries and inspect the transparent 5-step 'How did we get this answer?' audit trail." },
+    { num: 8, title: "Difference & Contradiction Detection", desc: "Distinguish direct contradictions from partial value delivery installments." }
   ];
 
   return (

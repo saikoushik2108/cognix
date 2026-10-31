@@ -20,10 +20,15 @@ export default function EvidenceCenterPage() {
     load();
   }, []);
 
-  const filteredEvidence = evidenceList.filter(item => {
-    const matchesFilter = filterType === 'All' || item.status.toLowerCase() === filterType.toLowerCase();
-    const matchesSearch = item.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.source_doc_name.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredEvidence = (evidenceList || []).filter(item => {
+    if (!item) return false;
+    const itemStatus = (item.status || "Supported").toLowerCase();
+    const itemText = (item.text || item.quote || item.evidence_text || item.quoted_text || "").toLowerCase();
+    const itemDoc = (item.source_doc_name || "").toLowerCase();
+    const query = searchQuery.toLowerCase();
+
+    const matchesFilter = filterType === 'All' || itemStatus === filterType.toLowerCase();
+    const matchesSearch = !query || itemText.includes(query) || itemDoc.includes(query);
     return matchesFilter && matchesSearch;
   });
 
@@ -101,7 +106,8 @@ export default function EvidenceCenterPage() {
 
       {/* Evidence Cards Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '18px' }}>
-        {filteredEvidence.map((evi) => {
+        {filteredEvidence.length > 0 ? (
+          filteredEvidence.map((evi) => {
           const isDisputed = evi.status === "Disputed";
           const isInReview = evi.status === "In Review";
           return (
@@ -142,16 +148,16 @@ export default function EvidenceCenterPage() {
                     <span>Verbatim Extracted Sentence</span>
                   </div>
                   <p style={{ fontSize: '0.9rem', fontStyle: 'italic', color: '#1e293b', lineHeight: 1.5 }}>
-                    "{evi.text}"
+                    "{evi.text || evi.quoted_text}"
                   </p>
                 </div>
 
                 {/* Provenance */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '14px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                   <FileText size={15} color="#2563eb" />
-                  <span style={{ fontWeight: 700 }}>{evi.source_doc_name}</span>
+                  <span style={{ fontWeight: 700 }}>{evi.source_doc_name || 'Document'}</span>
                   <span>•</span>
-                  <span>Page {evi.source_page}</span>
+                  <span>Page {evi.source_page || evi.page_number || 1}</span>
                 </div>
               </div>
 
@@ -167,7 +173,7 @@ export default function EvidenceCenterPage() {
                 <button
                   className="btn btn-primary btn-sm"
                   style={{ flex: 1 }}
-                  onClick={() => navigate(`/documents/inspector/${evi.source_doc_id}`)}
+                  onClick={() => navigate(`/documents/inspector/${evi.source_doc_id || ''}`)}
                 >
                   <ExternalLink size={14} />
                   <span>Open Document</span>
@@ -175,7 +181,14 @@ export default function EvidenceCenterPage() {
               </div>
             </div>
           );
-        })}
+        })
+        ) : (
+          <div className="card" style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted)', gridColumn: '1 / -1' }}>
+            <Quote size={40} color="#94a3b8" style={{ margin: '0 auto 12px auto' }} />
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>No source evidence recorded</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>Upload a document to extract verifiable sentence citations.</p>
+          </div>
+        )}
       </div>
 
       {/* Evidence Detail Modal */}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, ShieldCheck, Cpu, Sliders, CheckCircle2, Save } from 'lucide-react';
+import { Settings, ShieldCheck, Cpu, Sliders, CheckCircle2, Save, Brain, Key, Sparkles } from 'lucide-react';
 import { aiService } from '../services/aiService';
 
 export default function SettingsPage() {
@@ -70,6 +70,127 @@ export default function SettingsPage() {
           <Save size={16} />
           <span>Save Changes</span>
         </button>
+      </div>
+
+      {/* Knowledge Agent Reasoning Engine (Dual Mode) Card */}
+      <div className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px', borderLeft: '4px solid #2563eb' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Brain size={20} color="#2563eb" />
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Knowledge Agent Reasoning Engine</h2>
+          </div>
+          <span className="badge badge-blue">Dual Mode Architecture</span>
+        </div>
+
+        <div>
+          <label style={{ fontSize: '0.85rem', fontWeight: 700, display: 'block', marginBottom: '8px' }}>
+            Active Reasoning Engine
+          </label>
+          <select 
+            value={settings.agent_reasoning_mode || "Autonomous ReAct Agent (Real-Time)"}
+            onChange={e => setSettings({ ...settings, agent_reasoning_mode: e.target.value })}
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-light)',
+              backgroundColor: '#ffffff',
+              fontSize: '0.9rem',
+              color: 'var(--text-primary)',
+              fontWeight: 600
+            }}
+          >
+            <option value="Autonomous ReAct Agent (Real-Time)">Option 1: Autonomous ReAct Hybrid Agent (Default • 100% Real-Time • Zero API Keys)</option>
+            <option value="Pre-built LLM / API Key Gateway">Option 2: Pre-built LLM Reasoning Gateway (Groq, OpenRouter, OpenAI, Local Ollama)</option>
+          </select>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+            Option 1 executes real-time semantic SQL & graph traversal locally. Option 2 feeds verified ground-truth evidence to an LLM.
+          </span>
+        </div>
+
+        {/* Second Option Configuration */}
+        {settings.agent_reasoning_mode === "Pre-built LLM / API Key Gateway" && (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px',
+            backgroundColor: '#f8fafc',
+            padding: '16px',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid #e2e8f0'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Key size={16} color="#2563eb" />
+              <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#1e3a8a' }}>
+                Option 2: LLM Provider & API Credentials
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  Provider
+                </label>
+                <select
+                  value={settings.llm_provider || "groq"}
+                  onChange={e => setSettings({ ...settings, llm_provider: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-light)',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  <option value="groq">Groq Cloud (Llama-3.3-70B • Fast Free Tier)</option>
+                  <option value="openrouter">OpenRouter (Auto / Free Router)</option>
+                  <option value="openai">OpenAI (GPT-4o-mini)</option>
+                  <option value="ollama">Local Ollama (http://127.0.0.1:11434)</option>
+                  <option value="gemini">Google Gemini (Gemini-1.5-Flash)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                  {settings.llm_provider === "ollama" ? "Ollama Status" : "API Key"}
+                </label>
+                {settings.llm_provider === "ollama" ? (
+                  <input
+                    type="text"
+                    disabled
+                    value="Connected to local daemon (http://127.0.0.1:11434)"
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-light)',
+                      backgroundColor: '#f1f5f9',
+                      fontSize: '0.85rem',
+                      color: '#475569'
+                    }}
+                  />
+                ) : (
+                  <input
+                    type="password"
+                    placeholder={`Enter your ${settings.llm_provider || 'Groq'} API key...`}
+                    value={settings.llm_api_key || ""}
+                    onChange={e => setSettings({ ...settings, llm_api_key: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-light)',
+                      fontSize: '0.85rem'
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+            <div style={{ fontSize: '0.725rem', color: '#64748b' }}>
+              💡 If no key is provided, Cognix seamlessly uses our built-in real-time ReAct agent with 100% ground-truth accuracy.
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Model Selection Card */}

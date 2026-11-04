@@ -128,8 +128,9 @@ class QueryResponse(BaseModel):
     evidence_citations: List[Dict[str, Any]]
     graph: Optional[Dict[str, Any]] = None
     table: Optional[List[Dict[str, Any]]] = None
-    latency_seconds: Optional[str] = '1.42s'
-    execution_time_ms: Optional[float] = 1420.0
+    latency_seconds: Optional[str] = None
+    execution_time_ms: Optional[float] = None
+    engine: Optional[str] = 'Autonomous ReAct Agent' 
 
 class SemanticType(BaseModel):
     id: str
@@ -149,3 +150,6 @@ class SettingsModel(BaseModel):
     human_review_enabled: bool = True
     evidence_tracking_enabled: bool = True
     strict_hallucination_guardrails: bool = True
+    agent_reasoning_mode: str = 'Autonomous ReAct Agent (Real-Time)'
+    llm_api_key: Optional[str] = ''
+    llm_provider: Optional[str] = 'groq' 

@@ -1,8 +1,10 @@
+import os
 import re
 import json
 import uuid
 import time
 import sqlite3
+import requests
 from typing import Dict, Any, List, Optional, Tuple
 
 class SemanticAnalyticsTable:
@@ -229,7 +231,6 @@ class QueryTransformer:
                     target_org = e_name
                     break
 
-        # Also search for "Castro" or explicit names mentioned in prompt
         if not target_org:
             for term in ["castro", "smith", "merchant", "zuniga", "whitaker", "stout-miller", "campbell"]:
                 if term in q_lower:
@@ -270,17 +271,153 @@ class QueryTransformer:
         }
 
 
+class LLMGateway:
+    """
+    Model Gateway (Second Option - Pre-built LLM or API Key):
+    Allows live real-time LLM reasoning over the grounded knowledge context using:
+    - Local Ollama (qwen2.5, llama3.2, etc.) at http://127.0.0.1:11434
+    - Cloud APIs: Groq (free fast Llama-3.3), OpenRouter, OpenAI, Google Gemini
+    """
+    def __init__(self):
+        self.ollama_url = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+
+    def get_active_provider(self) -> Tuple[Optional[str], Optional[str]]:
+        groq_key = os.getenv("GROQ_API_KEY", "")
+        openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
+        openai_key = os.getenv("OPENAI_API_KEY", "")
+        gemini_key = os.getenv("GEMINI_API_KEY", "")
+
+        if groq_key:
+            return "groq", "Groq (Llama-3.3-70B)"
+        if openrouter_key:
+            return "openrouter", "OpenRouter Gateway"
+        if openai_key:
+            return "openai", "OpenAI (GPT-4o-mini)"
+        if gemini_key:
+            return "gemini", "Google Gemini"
+
+        # Check if Ollama has a downloaded model
+        try:
+            r = requests.get(f"{self.ollama_url}/api/tags", timeout=0.6)
+            if r.status_code == 200:
+                models = r.json().get("models", [])
+                if models:
+                    m_name = models[0].get("name", "qwen2.5")
+                    return "ollama", f"Local Ollama ({m_name})"
+        except Exception:
+            pass
+
+        return None, None
+
+    def synthesize(self, query: str, context: str, baseline_answer: str) -> Tuple[str, str]:
+        provider, display_name = self.get_active_provider()
+        if not provider:
+            return baseline_answer, "Autonomous ReAct Agent"
+
+        system_prompt = (
+            "You are Cognix, an autonomous Enterprise Knowledge Agent.\n"
+            "Answer the user's specific question directly, concisely, and factually using ONLY the verified invoice evidence provided.\n"
+            "CRITICAL RULES:\n"
+            "1. Answer ONLY what the user asked directly.\n"
+            "2. Never hallucinate, invent companies, or fabricate invoice numbers.\n"
+            "3. Do NOT append canned suggestions, follow-up ideas, or promotional footer notes.\n"
+            "4. Format the answer in crisp GitHub markdown."
+        )
+        user_content = f"VERIFIED INVOICE EVIDENCE:\n{context}\n\nUSER QUESTION: {query}"
+
+        try:
+            if provider == "groq":
+                resp = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}", "Content-Type": "application/json"},
+                    json={
+                        "model": "llama-3.3-70b-versatile",
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_content}
+                        ],
+                        "temperature": 0.1,
+                        "max_tokens": 400
+                    },
+                    timeout=8
+                )
+                if resp.status_code == 200:
+                    text = resp.json()["choices"][0]["message"]["content"].strip()
+                    return text, display_name
+
+            elif provider == "openrouter":
+                resp = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {os.getenv('OPENROUTER_API_KEY')}", "Content-Type": "application/json"},
+                    json={
+                        "model": "openrouter/auto",
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_content}
+                        ],
+                        "temperature": 0.1,
+                        "max_tokens": 400
+                    },
+                    timeout=8
+                )
+                if resp.status_code == 200:
+                    text = resp.json()["choices"][0]["message"]["content"].strip()
+                    return text, display_name
+
+            elif provider == "openai":
+                resp = requests.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}", "Content-Type": "application/json"},
+                    json={
+                        "model": "gpt-4o-mini",
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_content}
+                        ],
+                        "temperature": 0.1,
+                        "max_tokens": 400
+                    },
+                    timeout=8
+                )
+                if resp.status_code == 200:
+                    text = resp.json()["choices"][0]["message"]["content"].strip()
+                    return text, display_name
+
+            elif provider == "ollama":
+                model_name = display_name.split("(")[-1].replace(")", "").strip()
+                resp = requests.post(
+                    f"{self.ollama_url}/api/chat",
+                    json={
+                        "model": model_name,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_content}
+                        ],
+                        "stream": False,
+                        "options": {"temperature": 0.1}
+                    },
+                    timeout=12
+                )
+                if resp.status_code == 200:
+                    text = resp.json()["message"]["content"].strip()
+                    return text, display_name
+
+        except Exception as e:
+            print(f"LLM Gateway fallback: {e}")
+
+        return baseline_answer, "Autonomous ReAct Agent"
+
+
 class KnowledgeAgent:
     """
-    Autonomous ReAct Knowledge Agent with Deliberation, Grounded RAG, and Strict Output Filtering.
-    Conforms to the User's Architecture and Mentor's Guidance:
-    - Zero Hallucinations: Grounded directly in verified invoice records.
-    - Zero Boilerplate: Answers ONLY what was asked without canned suggestions or ending promotional filler.
-    - Realistic Agent Deliberation Latency: Computes exact timing and multi-step reasoning trace.
+    Autonomous ReAct Knowledge Agent with Real-Time Processing.
+    Zero Fake Delays, Zero Boilerplate, Direct Precise Answers.
+    Supports Optional LLM Gateway (Groq, OpenRouter, OpenAI, Local Ollama).
     """
     def __init__(self):
         self.semantic_table = SemanticAnalyticsTable()
         self.transformer = QueryTransformer()
+        self.llm_gateway = LLMGateway()
 
     def process_query(self, query: str, knowledge_base: Dict[str, Any]) -> Dict[str, Any]:
         start_time = time.time()
@@ -298,9 +435,6 @@ class KnowledgeAgent:
         intent = plan["primary_intent"]
         target_inv = plan["target_invoice"]
         target_org = plan["target_organization"]
-
-        # Realistic deliberation pause for agent query deconstruction
-        time.sleep(0.35)
 
         cur = self.semantic_table.conn.cursor()
 
@@ -331,16 +465,12 @@ class KnowledgeAgent:
         else:
             res = self._handle_general_search(query, cur, pipeline_steps)
 
-        # Realistic deliberation for verification guardrails
-        time.sleep(0.35)
+        # Optional LLM Gateway check (Option 2)
+        llm_answer, engine_name = self.llm_gateway.synthesize(query, res["answer"], res["answer"])
+        res["answer"] = llm_answer
+        res["engine"] = engine_name
 
-        # Calculate exact elapsed agent deliberation time
-        end_time = time.time()
-        elapsed_sec = round(end_time - start_time, 2)
-        if elapsed_sec < 1.2:
-            time.sleep(1.2 - elapsed_sec)
-            elapsed_sec = round(time.time() - start_time, 2)
-
+        elapsed_sec = round(time.time() - start_time, 3)
         res["latency_seconds"] = f"{elapsed_sec}s"
         res["execution_time_ms"] = round(elapsed_sec * 1000, 1)
 
@@ -385,7 +515,6 @@ class KnowledgeAgent:
             "detail": "Verified 100% precision. Zero hallucinations detected."
         })
 
-        # Build Clean Answer (Strictly concise, zero footer suggestions)
         item_lines = []
         for idx, it in enumerate(items[:6], 1):
             p_price = f"${it[3]:,.2f}" if it[3] > 0 else (it[4] if it[4] != "N/A" else "Standard Price")

@@ -601,6 +601,16 @@ def get_settings():
 def update_settings(settings: SettingsModel):
     global db_settings
     db_settings = settings
+    if settings.llm_api_key:
+        prov = (settings.llm_provider or "groq").lower()
+        if "groq" in prov:
+            os.environ["GROQ_API_KEY"] = settings.llm_api_key
+        elif "openrouter" in prov:
+            os.environ["OPENROUTER_API_KEY"] = settings.llm_api_key
+        elif "openai" in prov:
+            os.environ["OPENAI_API_KEY"] = settings.llm_api_key
+        elif "gemini" in prov:
+            os.environ["GEMINI_API_KEY"] = settings.llm_api_key
     return {"success": True, "settings": db_settings}
 
 # --- GLOBAL SEARCH ---

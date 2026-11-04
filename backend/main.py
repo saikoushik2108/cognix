@@ -2,7 +2,7 @@ import os
 import json
 import uuid
 from typing import List, Optional
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
 from fastapi.responses import Response, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -365,31 +365,48 @@ def get_evidence():
     return clean_ev
 
 @app.get("/knowledge/graph")
-def get_knowledge_graph():
+def get_knowledge_graph(limit: Optional[int] = Query(None, description="Max entities to return")):
     """
-    Format dynamic nodes and edges for React Flow knowledge graph visualization.
-    Pulls directly from live Neo4j cloud graph so relationship edges render properly.
+    Format dynamic nodes and edges for knowledge graph visualization.
+    Returns all entities and relationships synchronized with the active knowledge base.
     """
-    if neo4j_service.is_configured:
-        g = neo4j_service.get_graph_visualization(limit=300)
-        if g.get("nodes") and len(g["nodes"]) > 0:
-            return g
+    global db_entities, db_relationships
+    if len(db_entities) == 0:
+        docs, ents, rels, facts, evid = load_cached_knowledge_graph()
+        if ents:
+            db_entities, db_relationships = ents, rels
 
-    # Fallback to local active working graph
+    type_colors = {
+        "Invoice": "#f59e0b",
+        "Organization": "#2563eb",
+        "Company": "#2563eb",
+        "Product": "#10b981",
+        "Money": "#06b6d4",
+        "Location": "#8b5cf6",
+        "Date": "#64748b",
+        "Issue": "#ef4444"
+    }
+
+    selected_entities = db_entities if not limit or limit <= 0 else db_entities[:limit]
+
     nodes = []
     node_ids = set()
-    for idx, ent in enumerate(db_entities[:40]):
-        col = idx % 4
-        row = idx // 4
+    for ent in selected_entities:
+        e_name = ent.get("name", "").strip()
+        # Filter bare OCR header artifacts like 'Client:' or 'Vendor:' to prevent artificial hub clumping
+        if e_name.lower() in ["client:", "vendor:", "seller:", "buyer:"]:
+            continue
+        e_type = ent.get("type", "Entity")
         node_ids.add(ent["id"])
         nodes.append({
             "id": ent["id"],
-            "type": "customKnowledgeNode",
-            "position": {"x": 100 + col * 260, "y": 60 + row * 180},
+            "label": e_name,
+            "type": e_type,
+            "color": type_colors.get(e_type, "#8b5cf6"),
             "data": {
                 "id": ent["id"],
-                "label": ent["name"],
-                "type": ent["type"],
+                "label": e_name,
+                "type": e_type,
                 "confidence": ent.get("confidence", 0.98),
                 "status": ent.get("status", "Verified"),
                 "source": ent.get("source_doc_name", "Invoice")
@@ -404,12 +421,19 @@ def get_knowledge_graph():
                 "source": rel["source_entity_id"],
                 "target": rel["target_entity_id"],
                 "label": rel["relation_type"],
-                "animated": True,
-                "style": {"stroke": "#2563eb", "strokeWidth": 2},
                 "data": {"relation_type": rel["relation_type"], "confidence": rel.get("confidence", 0.98)}
             })
 
-    return {"nodes": nodes, "edges": edges, "meta": {"total_nodes": len(nodes), "total_edges": len(edges)}}
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "meta": {
+            "total_nodes": len(nodes),
+            "total_edges": len(edges),
+            "total_db_entities": len(db_entities),
+            "total_db_relationships": len(db_relationships)
+        }
+    }
 
 # --- NATURAL LANGUAGE QUERYING ---
 

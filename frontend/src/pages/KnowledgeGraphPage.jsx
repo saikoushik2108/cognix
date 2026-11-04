@@ -3,24 +3,24 @@ import {
   Search, Maximize2, Minimize2, Download, RefreshCw, 
   X, ExternalLink, Database, Layers, Building2, Box, 
   FileText, DollarSign, Sparkles, Plus, Minus, Target, 
-  Share2, ShieldCheck, Copy, Check, Zap
+  Share2, ShieldCheck, Copy, Check, Zap, Sliders
 } from 'lucide-react';
 import Sigma from 'sigma';
 import Graph from 'graphology';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import { aiService } from '../services/aiService';
 
-// Vibrant Neo4j Color Palette for Entities on Light Theme
+// Vibrant Neo4j Bloom Color Palette on Light Theme
 const COLOR_MAP = {
   Invoice: '#f59e0b',      // Warm Amber/Gold
-  Company: '#2563eb',      // Royal Blue
   Organization: '#2563eb', // Royal Blue
+  Company: '#2563eb',      // Royal Blue
   Product: '#10b981',      // Emerald Green
   Money: '#06b6d4',        // Cyan / Teal
   Location: '#8b5cf6',     // Purple
   Date: '#64748b',         // Slate Grey
   Issue: '#ef4444',        // Rose Red
-  Entity: '#f43f5e'        // Coral Red
+  Entity: '#6366f1'        // Indigo
 };
 
 export default function KnowledgeGraphPage() {
@@ -32,6 +32,7 @@ export default function KnowledgeGraphPage() {
   const [hoveredNode, setHoveredNode] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [filterType, setFilterType] = useState('All');
+  const [viewLimit, setViewLimit] = useState(300); // 150 | 300 | 800 | 0 (all)
   const [copied, setCopied] = useState(false);
 
   const containerRef = useRef(null);
@@ -64,7 +65,7 @@ export default function KnowledgeGraphPage() {
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
-  // Fetch Graph Data from Backend
+  // Fetch Graph Data from Backend (returns all 2,700+ entities)
   const fetchGraph = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -81,17 +82,19 @@ export default function KnowledgeGraphPage() {
     fetchGraph();
   }, [fetchGraph]);
 
-  // Compute node statistics for legend and dropdowns
+  // Compute accurate node statistics across all nodes
   const nodeStats = useMemo(() => {
     const counts = {};
     (graphData.nodes || []).forEach(n => {
-      const t = n.type || n.data?.type || 'Entity';
+      const t = (n.type && n.type !== 'customKnowledgeNode')
+        ? n.type
+        : (n.data?.type && n.data.type !== 'customKnowledgeNode' ? n.data.type : 'Entity');
       counts[t] = (counts[t] || 0) + 1;
     });
     return counts;
   }, [graphData.nodes]);
 
-  // Active target node ID for neighbor highlighting in Sigma
+  // Active target node ID for neighbor spotlighting
   const activeTargetId = hoveredNode || selectedNode?.id || null;
 
   // Build and Initialize Sigma.js WebGL Graph Renderer
@@ -103,9 +106,12 @@ export default function KnowledgeGraphPage() {
 
     if (rawNodes.length === 0) return;
 
-    // Filter nodes based on user selection and search query
-    const filteredNodes = rawNodes.filter(n => {
-      const type = n.type || n.data?.type || 'Entity';
+    // 1. Filter nodes based on category and search query
+    let filteredNodes = rawNodes.filter(n => {
+      const type = (n.type && n.type !== 'customKnowledgeNode')
+        ? n.type
+        : (n.data?.type && n.data.type !== 'customKnowledgeNode' ? n.data.type : 'Entity');
+
       if (filterType !== 'All' && type !== filterType) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -116,9 +122,14 @@ export default function KnowledgeGraphPage() {
       return true;
     });
 
+    // 2. Apply view density limit if selected (to allow smooth exploration of 150, 300, 800, or all 2700+)
+    if (viewLimit > 0 && filteredNodes.length > viewLimit) {
+      filteredNodes = filteredNodes.slice(0, viewLimit);
+    }
+
     const nodeIds = new Set(filteredNodes.map(n => n.id));
 
-    // Calculate node degree
+    // 3. Calculate degree index for node sizing and importance
     const degMap = {};
     rawEdges.forEach(e => {
       if (nodeIds.has(e.source) && nodeIds.has(e.target)) {
@@ -127,31 +138,37 @@ export default function KnowledgeGraphPage() {
       }
     });
 
-    // Create Graphology multi-graph instance
+    // 4. Create Graphology Multi-Graph
     const graph = new Graph({ multi: true });
     graphologyInstanceRef.current = graph;
 
-    // Populate Nodes
+    // 5. Populate Nodes with clean Neo4j Bloom sizing and spiral coordinates
     const totalCount = filteredNodes.length;
     filteredNodes.forEach((n, idx) => {
-      const type = n.type || n.data?.type || 'Entity';
+      const type = (n.type && n.type !== 'customKnowledgeNode')
+        ? n.type
+        : (n.data?.type && n.data.type !== 'customKnowledgeNode' ? n.data.type : 'Entity');
       const color = COLOR_MAP[type] || '#2563eb';
       const deg = degMap[n.id] || 1;
 
-      let size = 12;
-      if (type === 'Invoice') size = 20;
-      else if (type === 'Company' || type === 'Organization') size = 22;
-      else if (type === 'Product') size = 13;
-      else if (type === 'Location') size = 14;
+      // Refined sizes: Hubs (Invoices/Orgs) are prominent, Items are sleek to prevent overlapping clumps
+      let size = 4.5;
+      if (type === 'Invoice') size = 7.0;
+      else if (type === 'Company' || type === 'Organization') size = 8.0;
+      else if (type === 'Product') size = 3.8;
+      else if (type === 'Money') size = 4.2;
+      else if (type === 'Location') size = 4.5;
 
-      // Deterministic radial layout for fast ForceAtlas2 convergence
-      const angle = (idx / Math.max(1, totalCount)) * 2 * Math.PI;
-      const radius = 80 + (idx % 6) * 35;
+      // Galaxy spiral distribution prevents 2,700 nodes from starting on the same point
+      const angle = idx * 0.45;
+      const radius = 60 + Math.sqrt(idx) * 45;
+      const initialX = Math.cos(angle) * radius + (Math.sin(idx * 5) * 15);
+      const initialY = Math.sin(angle) * radius + (Math.cos(idx * 5) * 15);
 
       graph.addNode(n.id, {
         label: n.label || n.data?.label || n.id,
-        x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius,
+        x: initialX,
+        y: initialY,
         size: size,
         color: color,
         type: type,
@@ -168,7 +185,7 @@ export default function KnowledgeGraphPage() {
       });
     });
 
-    // Populate Edges
+    // 6. Populate Edges
     rawEdges.forEach((e, idx) => {
       if (graph.hasNode(e.source) && graph.hasNode(e.target)) {
         const edgeKey = e.id || `edge-${idx}`;
@@ -176,56 +193,64 @@ export default function KnowledgeGraphPage() {
           const relLabel = e.label || e.data?.relation_type || 'CONNECTED';
           graph.addEdgeWithKey(edgeKey, e.source, e.target, {
             label: relLabel,
-            size: 1.5,
-            color: '#94a3b8',
+            size: 1.2,
+            color: '#cbd5e1',
             type: 'arrow'
           });
         }
       }
     });
 
-    // Run ForceAtlas2 Layout
+    // 7. Execute ForceAtlas2 physics with collision prevention (adjustSizes: true)
     if (graph.order > 0) {
       forceAtlas2.assign(graph, {
-        iterations: 120,
+        iterations: Math.min(160, Math.max(70, Math.floor(35000 / graph.order))),
         settings: {
-          gravity: 0.8,
-          scalingRatio: 12,
+          gravity: 0.18,          // Low gravity expands clusters gracefully
+          scalingRatio: 35,       // Strong inter-cluster separation prevents clumps
+          adjustSizes: true,      // PREVENTS NODE OVERLAPPING
           barnesHutOptimize: true,
-          slowDown: 1.5
+          barnesHutTheta: 0.8,
+          slowDown: 3.0,
+          strongGravityMode: false
         }
       });
     }
 
-    // Clean up any existing Sigma instance
+    // Clean up previous Sigma instance
     if (sigmaInstanceRef.current) {
       sigmaInstanceRef.current.kill();
       sigmaInstanceRef.current = null;
     }
 
-    // Instantiate WebGL Sigma.js Renderer
+    // 8. Instantiate Hardware-Accelerated Sigma.js Renderer
     const sigma = new Sigma(graph, sigmaContainerRef.current, {
       renderEdgeLabels: true,
       enableEdgeEvents: true,
       enableNodeDrag: true,
-      minCameraRatio: 0.1,
-      maxCameraRatio: 8,
+      minCameraRatio: 0.04,
+      maxCameraRatio: 12,
       defaultEdgeType: 'arrow',
-      defaultEdgeColor: '#94a3b8',
+      defaultEdgeColor: '#cbd5e1',
+      defaultNodeColor: '#2563eb',
       labelFont: 'Inter, system-ui, -apple-system, sans-serif',
       labelSize: 11,
-      labelWeight: '700',
+      labelWeight: '600',
       labelColor: { color: '#1e293b' },
-      stagePadding: 50,
+      labelRenderedSizeThreshold: 10, // Clean, non-overlapping: labels appear smoothly upon zoom or hover
+      labelDensity: 0.75,
+      labelGridCellSize: 65,
+      stagePadding: 70,
       allowInvalidContainer: true,
       nodeReducer: (node, data) => {
         const res = { ...data };
         if (activeTargetId) {
           if (node === activeTargetId || graph.areNeighbors(node, activeTargetId)) {
             res.highlighted = true;
-            res.zIndex = 2;
+            res.size = data.size * 1.5;
+            res.zIndex = 3;
           } else {
-            res.color = '#cbd5e1';
+            res.color = '#e2e8f0';
             res.label = '';
             res.zIndex = 0;
           }
@@ -249,7 +274,7 @@ export default function KnowledgeGraphPage() {
 
     sigmaInstanceRef.current = sigma;
 
-    // Bind Node Click & Hover Events
+    // Bind Interaction Events
     sigma.on('clickNode', ({ node }) => {
       const orig = graph.getNodeAttribute(node, 'originalData');
       setSelectedNode(orig || { id: node, label: graph.getNodeAttribute(node, 'label') });
@@ -267,16 +292,15 @@ export default function KnowledgeGraphPage() {
       setSelectedNode(null);
     });
 
-    // Cleanup on unmount or re-render
     return () => {
       if (sigmaInstanceRef.current) {
         sigmaInstanceRef.current.kill();
         sigmaInstanceRef.current = null;
       }
     };
-  }, [graphData, filterType, searchQuery, activeTab]);
+  }, [graphData, filterType, viewLimit, searchQuery, activeTab]);
 
-  // Update dynamic reducers when selection or hover changes
+  // Dynamic Reducers Update on Hover / Selection
   useEffect(() => {
     if (!sigmaInstanceRef.current || !graphologyInstanceRef.current) return;
     const graph = graphologyInstanceRef.current;
@@ -286,9 +310,10 @@ export default function KnowledgeGraphPage() {
       if (activeTargetId) {
         if (node === activeTargetId || graph.areNeighbors(node, activeTargetId)) {
           res.highlighted = true;
-          res.zIndex = 2;
+          res.size = data.size * 1.5;
+          res.zIndex = 3;
         } else {
-          res.color = '#cbd5e1';
+          res.color = '#e2e8f0';
           res.label = '';
           res.zIndex = 0;
         }
@@ -313,7 +338,7 @@ export default function KnowledgeGraphPage() {
     sigmaInstanceRef.current.refresh();
   }, [activeTargetId]);
 
-  // Camera Zoom & Reset Controls
+  // Camera Controls
   const handleZoomIn = () => {
     if (sigmaInstanceRef.current) {
       sigmaInstanceRef.current.getCamera().zoomIn({ factor: 1.35 });
@@ -337,12 +362,13 @@ export default function KnowledgeGraphPage() {
     const graph = graphologyInstanceRef.current;
     if (graph && graph.order > 0) {
       forceAtlas2.assign(graph, {
-        iterations: 100,
+        iterations: 120,
         settings: {
-          gravity: 0.8,
-          scalingRatio: 12,
+          gravity: 0.18,
+          scalingRatio: 35,
+          adjustSizes: true,
           barnesHutOptimize: true,
-          slowDown: 1.5
+          slowDown: 3.0
         }
       });
       if (sigmaInstanceRef.current) {
@@ -365,7 +391,7 @@ export default function KnowledgeGraphPage() {
       a.click();
       document.body.removeChild(a);
     } catch (err) {
-      console.warn("WebGL canvas export note:", err);
+      console.warn("WebGL export note:", err);
     }
   };
 
@@ -385,6 +411,8 @@ LIMIT 300;`;
     if (!selectedNode) return [];
     return (graphData.edges || []).filter(e => e.source === selectedNode.id || e.target === selectedNode.id);
   }, [selectedNode, graphData.edges]);
+
+  const totalVisibleNodes = viewLimit > 0 ? Math.min(viewLimit, graphData.nodes?.length || 0) : (graphData.nodes?.length || 0);
 
   return (
     <div 
@@ -434,7 +462,7 @@ LIMIT 300;`;
             }}
           >
             <Layers size={15} />
-            <span>Graph View (Sigma.js WebGL)</span>
+            <span>Graph View</span>
           </button>
 
           <button
@@ -499,7 +527,7 @@ LIMIT 300;`;
           </div>
 
           {/* Search Input */}
-          <div style={{ position: 'relative', width: '220px' }}>
+          <div style={{ position: 'relative', width: '200px' }}>
             <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
               type="text"
@@ -519,6 +547,28 @@ LIMIT 300;`;
             />
           </div>
 
+          {/* Density Selector */}
+          <select
+            value={viewLimit}
+            onChange={(e) => setViewLimit(Number(e.target.value))}
+            title="Display density"
+            style={{
+              padding: '6px 10px',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-light)',
+              backgroundColor: '#ffffff',
+              color: 'var(--text-primary)',
+              cursor: 'pointer'
+            }}
+          >
+            <option value="150">Density: Top 150</option>
+            <option value="300">Density: Top 300 (Recommended)</option>
+            <option value="800">Density: Top 800</option>
+            <option value="0">All {graphData.nodes?.length || 2716} Entities</option>
+          </select>
+
           {/* Category Filter Dropdown */}
           <select
             value={filterType}
@@ -534,18 +584,17 @@ LIMIT 300;`;
               cursor: 'pointer'
             }}
           >
-            <option value="All">All Entities ({graphData.nodes?.length || 0})</option>
+            <option value="All">All Categories ({totalVisibleNodes})</option>
             <option value="Invoice">Invoices ({nodeStats.Invoice || 0})</option>
             <option value="Organization">Organizations ({nodeStats.Organization || 0})</option>
-            <option value="Company">Companies ({nodeStats.Company || 0})</option>
             <option value="Product">Products ({nodeStats.Product || 0})</option>
-            <option value="Location">Locations ({nodeStats.Location || 0})</option>
+            <option value="Money">Money ({nodeStats.Money || 0})</option>
           </select>
 
           {/* Re-simulate / Align Button */}
           <button
             onClick={handleReSimulate}
-            title="Re-run ForceAtlas2 Physics Simulation"
+            title="Re-run ForceAtlas2 Physics Layout"
             style={{
               padding: '6px 10px',
               borderRadius: 'var(--radius-md)',
@@ -634,7 +683,7 @@ LIMIT 300;`;
               zIndex: 30
             }}>
               <RefreshCw size={18} className="animate-spin" />
-              <span>Rendering WebGL Knowledge Graph...</span>
+              <span>Rendering 2,700+ Entities in WebGL...</span>
             </div>
           )}
 
@@ -707,7 +756,7 @@ LIMIT 300;`;
             </button>
           </div>
 
-          {/* Color Legend (Bottom Right) */}
+          {/* Color Legend (Bottom Right) with Exact Counts */}
           <div style={{
             position: 'absolute',
             bottom: '20px',
@@ -730,15 +779,15 @@ LIMIT 300;`;
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-primary)', fontWeight: 700 }}>
               <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: COLOR_MAP.Organization }} />
-              <span>Organization ({nodeStats.Organization || nodeStats.Company || 0})</span>
+              <span>Organization ({nodeStats.Organization || 0})</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-primary)', fontWeight: 700 }}>
               <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: COLOR_MAP.Product }} />
               <span>Product ({nodeStats.Product || 0})</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-primary)', fontWeight: 700 }}>
-              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: COLOR_MAP.Location }} />
-              <span>Location ({nodeStats.Location || 0})</span>
+              <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: COLOR_MAP.Money }} />
+              <span>Money ({nodeStats.Money || 0})</span>
             </div>
           </div>
 
@@ -905,7 +954,7 @@ LIMIT 300;`;
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Raw Neo4j Aura Bolt Response Payload
+                Raw Knowledge Graph Records
               </span>
               <span className="badge badge-blue">
                 JSON
@@ -951,9 +1000,9 @@ RETURN a, r, b
 LIMIT 300;
 
 // Summary Metadata:
-// Total Active Nodes: ${graphData.nodes?.length || 0}
-// Total Active Relationships: ${graphData.edges?.length || 0}
-// Rendering Engine: Sigma.js (WebGL Accelerated)
+// Total Synchronized Nodes: ${graphData.nodes?.length || 0}
+// Total Synchronized Relationships: ${graphData.edges?.length || 0}
+// Rendering Engine: Sigma.js (WebGL 60 FPS Accelerated)
 
 ${JSON.stringify(graphData, null, 2)}`}
           </div>

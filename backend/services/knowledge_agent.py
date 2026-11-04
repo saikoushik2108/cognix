@@ -7,6 +7,24 @@ import sqlite3
 import requests
 from typing import Dict, Any, List, Optional, Tuple
 
+def _load_env_file():
+    env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    if os.path.exists(env_file):
+        try:
+            with open(env_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip('"').strip("'")
+                        if k and not os.environ.get(k):
+                            os.environ[k] = v
+        except Exception:
+            pass
+
+_load_env_file()
+
 class SemanticAnalyticsTable:
     """
     Structured Analytics Table & Semantic Compute Layer.
@@ -381,6 +399,22 @@ class LLMGateway:
                 )
                 if resp.status_code == 200:
                     text = resp.json()["choices"][0]["message"]["content"].strip()
+                    return text, display_name
+
+            elif provider == "gemini":
+                gemini_key = os.getenv("GEMINI_API_KEY", "")
+                resp = requests.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}",
+                    headers={"Content-Type": "application/json"},
+                    json={
+                        "system_instruction": {"parts": [{"text": system_prompt}]},
+                        "contents": [{"parts": [{"text": user_content}]}],
+                        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 512}
+                    },
+                    timeout=10
+                )
+                if resp.status_code == 200:
+                    text = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
                     return text, display_name
 
             elif provider == "ollama":

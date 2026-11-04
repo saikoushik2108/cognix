@@ -345,23 +345,31 @@ class LLMGateway:
 
         try:
             if provider == "groq":
-                resp = requests.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}", "Content-Type": "application/json"},
-                    json={
-                        "model": "llama-3.3-70b-versatile",
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_content}
-                        ],
-                        "temperature": 0.1,
-                        "max_tokens": 400
-                    },
-                    timeout=8
-                )
-                if resp.status_code == 200:
-                    text = resp.json()["choices"][0]["message"]["content"].strip()
-                    return text, display_name
+                groq_key = os.getenv("GROQ_API_KEY")
+                models = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile"]
+                for m in models:
+                    try:
+                        resp = requests.post(
+                            "https://api.groq.com/openai/v1/chat/completions",
+                            headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                            json={
+                                "model": m,
+                                "messages": [
+                                    {"role": "system", "content": system_prompt},
+                                    {"role": "user", "content": user_content}
+                                ],
+                                "temperature": 0.1,
+                                "max_tokens": 500
+                            },
+                            timeout=12
+                        )
+                        if resp.status_code == 200:
+                            msg = resp.json()["choices"][0]["message"]
+                            content = (msg.get("content") or "").strip()
+                            if content:
+                                return content, f"Groq Cloud ({m})"
+                    except Exception as ex:
+                        print(f"Groq model {m} attempt: {ex}")
 
             elif provider == "openrouter":
                 resp = requests.post(

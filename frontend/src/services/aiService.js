@@ -12,7 +12,7 @@ import {
 
 class AIService {
   constructor() {
-    this.apiBase = '/api';
+    this.apiBase = import.meta.env.VITE_API_URL || '/api';
 
     const getStored = (key, fallback) => {
       try {

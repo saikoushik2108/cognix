@@ -17,6 +17,7 @@ from data.seed_data import (
     SEMANTIC_MODEL_ENTITIES, ANALYTICS_DATA
 )
 from services.ai_service import ai_service
+from services.knowledge_agent import knowledge_agent
 from services.neo4j_service import neo4j_service
 from services.invoice_dataset_loader import invoice_dataset_loader
 from services.document_parser import (
@@ -463,7 +464,7 @@ def query_knowledge(req: QueryRequest):
         "evidence": db_evidence,
         "documents": db_documents
     }
-    result = ai_service.answer_knowledge_query(req.query, knowledge_base)
+    result = knowledge_agent.process_query(req.query, knowledge_base)
     return QueryResponse(**result)
 
 # --- HUMAN-IN-THE-LOOP REVIEW ---

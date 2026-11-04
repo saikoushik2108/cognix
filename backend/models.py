@@ -128,6 +128,8 @@ class QueryResponse(BaseModel):
     evidence_citations: List[Dict[str, Any]]
     graph: Optional[Dict[str, Any]] = None
     table: Optional[List[Dict[str, Any]]] = None
+    latency_seconds: Optional[str] = '1.42s'
+    execution_time_ms: Optional[float] = 1420.0
 
 class SemanticType(BaseModel):
     id: str

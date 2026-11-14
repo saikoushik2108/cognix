@@ -10,3 +10,4 @@ if exist "C:\Users\saiko\AppData\Roaming\uv\python\cpython-3.11-windows-x86_64-n
 
 echo Starting Cognix Backend on http://127.0.0.1:8000 ...
 "%PY_EXE%" -m uvicorn main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload
+

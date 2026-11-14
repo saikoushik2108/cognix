@@ -16,9 +16,12 @@ and generates extensive entities, relationships, facts, and traceable evidence c
 import re
 import uuid
 from typing import Dict, Any, List, Optional
-from rapidocr_onnxruntime import RapidOCR
-
-ocr_engine = RapidOCR()
+try:
+    from rapidocr_onnxruntime import RapidOCR
+    ocr_engine = RapidOCR()
+except Exception as _ocr_err:
+    print(f"[Warning] RapidOCR not available ({_ocr_err}); running in fallback mode.")
+    ocr_engine = None
 
 class InvoiceOCRExtractor:
     def __init__(self):
@@ -34,6 +37,12 @@ class InvoiceOCRExtractor:
         Runs pure OCR on image bytes, extracts bounding lines and tokens,
         and builds an extensive enterprise knowledge graph.
         """
+        if not self.ocr:
+            return {
+                "document_summary": {"invoice_no": "Unknown", "vendor": "Unknown", "client": "Unknown", "total_amount": "N/A"},
+                "entities": [], "relationships": [], "facts": [], "evidence": [],
+                "raw_text": "OCR engine unavailable on host.", "bounding_boxes": []
+            }
         ocr_results, elapse = self.ocr(image_bytes)
         lines = []
         raw_text_parts = []

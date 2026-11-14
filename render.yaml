@@ -16,3 +16,4 @@ services:
         sync: false
       - key: NEO4J_PASSWORD
         sync: false
+
